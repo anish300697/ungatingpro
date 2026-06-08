@@ -177,7 +177,7 @@
               <li>Invoice, photo, and support document merging</li>
               <li>ASIN-named PDF downloads</li>
             </ul>
-            <button type="button">Choose Monthly</button>
+            <button id="chooseMonthly" type="button" data-plan-type="monthly">Choose Monthly</button>
           </article>
 
           <article class="pricing-card featured">
@@ -197,8 +197,51 @@
               <li>Ideal for ongoing replenishment and new ASIN approval work</li>
               <li>Cleaner yearly billing</li>
             </ul>
-            <button type="button">Choose Yearly</button>
+            <button id="chooseYearly" type="button" data-plan-type="yearly">Choose Yearly</button>
           </article>
+        </section>
+      </section>
+
+      <section id="paymentPage" class="page payment-page is-hidden" aria-label="Subscription payment">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Subscription Checkout</p>
+            <h1>Payment</h1>
+            <p>Review your selected plan, apply a coupon, and continue to payment.</p>
+          </div>
+        </header>
+
+        <section class="payment-panel">
+          <div class="payment-summary">
+            <div>
+              <span>Selected Plan</span>
+              <strong id="paymentPlanName">Unlimited Generate</strong>
+            </div>
+            <div>
+              <span>Billing Cycle</span>
+              <strong id="paymentBillingCycle">Monthly</strong>
+            </div>
+            <div>
+              <span>Price</span>
+              <strong id="paymentPlanPrice">$9.99</strong>
+            </div>
+          </div>
+
+          <div class="coupon-row">
+            <label>
+              Coupon code
+              <input id="couponCode" placeholder="LAUNCH10" />
+            </label>
+            <button id="applyCoupon" type="button">Apply Coupon</button>
+          </div>
+
+          <div class="payment-total">
+            <span>Final Total</span>
+            <strong id="paymentFinalTotal">$9.99</strong>
+          </div>
+
+          <p id="paymentStatus" class="download-status" aria-live="polite"></p>
+          <button id="continuePayment" type="button">Continue to Payment</button>
         </section>
       </section>
 

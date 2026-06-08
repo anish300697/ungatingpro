@@ -16,6 +16,15 @@ const sessionDays = 14;
 const resetTokenMinutes = 30;
 const resetRequestLimit = 5;
 const resetRateWindowMs = 15 * 60 * 1000;
+const coupons = {
+  LAUNCH10: { type: "percent", amount: 10 },
+  BETA25: { type: "percent", amount: 25 },
+  YEARLY50: { type: "fixed", amount: 50, planType: "yearly" }
+};
+const plans = {
+  monthly: { planType: "monthly", planName: "Unlimited Generate", planPrice: 9.99, billingCycle: "Monthly" },
+  yearly: { planType: "yearly", planName: "Unlimited Generate", planPrice: 96, billingCycle: "Yearly" }
+};
 
 let dbPool = null;
 let dbReady = false;
@@ -116,10 +125,16 @@ async function initDatabase() {
       role VARCHAR(32) NOT NULL DEFAULT 'user',
       status VARCHAR(32) NOT NULL DEFAULT 'active',
       is_master TINYINT(1) NOT NULL DEFAULT 0,
+      subscription_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
+      plan_type VARCHAR(32) NULL,
+      subscription_started_at DATETIME NULL,
+      subscription_expires_at DATETIME NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  await ensureUserSubscriptionColumns();
 
   await dbPool.execute(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -143,8 +158,47 @@ async function initDatabase() {
     )
   `);
 
+  await dbPool.execute(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      plan_type VARCHAR(32) NOT NULL,
+      coupon_code VARCHAR(64) NULL,
+      discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      final_amount DECIMAL(10,2) NOT NULL,
+      payment_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   await seedMasterAccount();
   dbReady = true;
+}
+
+async function ensureUserSubscriptionColumns() {
+  const columns = [
+    ["subscription_status", "VARCHAR(32) NOT NULL DEFAULT 'inactive'"],
+    ["plan_type", "VARCHAR(32) NULL"],
+    ["subscription_started_at", "DATETIME NULL"],
+    ["subscription_expires_at", "DATETIME NULL"]
+  ];
+
+  for (const [column, definition] of columns) {
+    const [rows] = await dbPool.execute(
+      `
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'users'
+          AND COLUMN_NAME = :column
+      `,
+      { column }
+    );
+    if (!rows.length) {
+      await dbPool.execute(`ALTER TABLE users ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }
 
 function hashPassword(password) {
@@ -178,8 +232,23 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     status: user.status,
-    isMaster: Boolean(user.is_master)
+    isMaster: Boolean(user.is_master),
+    subscriptionStatus: user.subscription_status || "inactive",
+    planType: user.plan_type || null,
+    subscriptionStartedAt: user.subscription_started_at || null,
+    subscriptionExpiresAt: user.subscription_expires_at || null,
+    hasActiveAccess: hasActiveAccess(user)
   };
+}
+
+function hasActiveAccess(user) {
+  if (!user) return false;
+  if (user.is_master || user.role === "admin") return true;
+  const status = user.subscription_status;
+  const activeStatus = status === "active" || status === "trial";
+  if (!activeStatus) return false;
+  if (!user.subscription_expires_at) return true;
+  return new Date(user.subscription_expires_at).getTime() > Date.now();
 }
 
 function getPublicBaseUrl(request) {
@@ -324,6 +393,26 @@ async function requireAdmin(request, response) {
   }
   if (user.role !== "admin" && !user.is_master) {
     sendJson(response, 403, { error: "Master admin access is required." });
+    return null;
+  }
+  return user;
+}
+
+async function requireSignedIn(request, response) {
+  if (!requireDatabase(response)) return null;
+  const user = await getSessionUser(request);
+  if (!user) {
+    sendJson(response, 401, { error: "Sign in is required." });
+    return null;
+  }
+  return user;
+}
+
+async function requireActiveAccess(request, response) {
+  const user = await requireSignedIn(request, response);
+  if (!user) return null;
+  if (!hasActiveAccess(user)) {
+    sendJson(response, 402, { error: "An active subscription or free trial is required to use this feature." });
     return null;
   }
   return user;
@@ -552,6 +641,92 @@ async function handleAdminUserUpdate(request, response) {
   }
 }
 
+function roundMoney(value) {
+  return Math.max(0, Math.round(Number(value) * 100) / 100);
+}
+
+function calculatePlanTotal(planType, couponCode = "") {
+  const plan = plans[planType];
+  if (!plan) {
+    return { error: "Invalid plan selected." };
+  }
+
+  const normalizedCoupon = String(couponCode || "").trim().toUpperCase();
+  const coupon = normalizedCoupon ? coupons[normalizedCoupon] : null;
+  if (normalizedCoupon && !coupon) {
+    return { error: "Invalid coupon code." };
+  }
+  if (coupon?.planType && coupon.planType !== planType) {
+    return { error: "Invalid coupon code." };
+  }
+
+  let discountAmount = 0;
+  if (coupon?.type === "percent") {
+    discountAmount = roundMoney(plan.planPrice * (coupon.amount / 100));
+  } else if (coupon?.type === "fixed") {
+    discountAmount = roundMoney(coupon.amount);
+  }
+
+  const finalAmount = roundMoney(plan.planPrice - discountAmount);
+  return {
+    ...plan,
+    couponCode: normalizedCoupon || null,
+    discountAmount,
+    finalAmount
+  };
+}
+
+async function handleValidateCoupon(request, response) {
+  try {
+    const payload = await readJsonBody(request);
+    const total = calculatePlanTotal(payload.planType, payload.couponCode);
+    if (total.error) {
+      sendJson(response, 400, { error: total.error });
+      return;
+    }
+    sendJson(response, 200, total);
+  } catch (error) {
+    sendJson(response, 500, { error: "Could not validate coupon." });
+  }
+}
+
+async function handleCreateCheckout(request, response) {
+  const user = await requireSignedIn(request, response);
+  if (!user) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const total = calculatePlanTotal(payload.planType, payload.couponCode);
+    if (total.error) {
+      sendJson(response, 400, { error: total.error });
+      return;
+    }
+
+    const [result] = await dbPool.execute(
+      `
+        INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
+        VALUES (:userId, :planType, :couponCode, :discountAmount, :finalAmount, 'pending')
+      `,
+      {
+        userId: user.id,
+        planType: total.planType,
+        couponCode: total.couponCode,
+        discountAmount: total.discountAmount,
+        finalAmount: total.finalAmount
+      }
+    );
+
+    sendJson(response, 200, {
+      paymentId: result.insertId,
+      stripePending: true,
+      message: "Stripe integration pending. Payment has not been processed yet.",
+      total
+    });
+  } catch (error) {
+    sendJson(response, 500, { error: "Could not start payment." });
+  }
+}
+
 function parseMultipart(buffer, contentType) {
   const boundaryMatch = /boundary=([^;]+)/i.exec(contentType || "");
   if (!boundaryMatch) return [];
@@ -679,6 +854,9 @@ async function appendTextDocument(pdfDoc, title, text) {
 }
 
 async function handleWordConversion(request, response) {
+  const user = await requireActiveAccess(request, response);
+  if (!user) return;
+
   try {
     const body = await readRequestBody(request);
     const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"]));
@@ -766,6 +944,9 @@ async function appendPhotoPage(pdfDoc, file) {
 }
 
 async function handlePhotoConversion(request, response) {
+  const user = await requireActiveAccess(request, response);
+  if (!user) return;
+
   try {
     const body = await readRequestBody(request);
     const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"])).filter(isSupportedPhoto);
@@ -935,6 +1116,9 @@ async function appendMasterFile(pdfDoc, file) {
 }
 
 async function handleMasterPdfGeneration(request, response) {
+  const user = await requireActiveAccess(request, response);
+  if (!user) return;
+
   try {
     const body = await readRequestBody(request);
     const parts = parseMultipart(body, request.headers["content-type"]);
@@ -987,7 +1171,7 @@ async function handleMasterPdfGeneration(request, response) {
 }
 
 function getSafeStaticPath(pathname) {
-  const appRoutes = new Set(["/", "/signin", "/forgot-password", "/reset-password"]);
+  const appRoutes = new Set(["/", "/signin", "/forgot-password", "/reset-password", "/builder", "/convert", "/subscription", "/payment"]);
   const requested = appRoutes.has(pathname) ? "/index.html" : pathname;
   const filePath = normalize(join(root, requested));
   const rootWithSeparator = root.endsWith(sep) ? root : `${root}${sep}`;
@@ -1044,6 +1228,16 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/auth/reset-password") {
     await handlePasswordReset(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/subscription/validate-coupon") {
+    await handleValidateCoupon(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/subscription/create-checkout") {
+    await handleCreateCheckout(request, response);
     return;
   }
 
