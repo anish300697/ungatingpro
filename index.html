@@ -14,7 +14,7 @@
           <a id="ungateBuilderLink" href="#builder">Ungate Builder</a>
           <a id="convertLink" href="#convert">Convert</a>
           <a id="subscriptionLink" href="#subscription">Subscription</a>
-          <a id="signInLink" href="#account">Sign In</a>
+          <a id="signInLink" href="/signin">Sign In</a>
         </div>
       </nav>
 
@@ -207,7 +207,7 @@
           <div>
             <p class="eyebrow">Account Access</p>
             <h1>Sign In</h1>
-            <p>Access your seller workspace, save account details, and manage A2Z UNGATING access.</p>
+            <p>Access your seller workspace and continue preparing ungating documents.</p>
           </div>
         </header>
 
@@ -223,8 +223,8 @@
               <input id="signInPassword" type="password" autocomplete="current-password" required />
             </label>
             <button type="submit">Sign In</button>
-            <button id="forgotPasswordOpen" type="button" class="link-button is-hidden">Forgot password?</button>
             <p id="signInStatus" class="download-status" aria-live="polite"></p>
+            <a id="forgotPasswordLink" class="auth-link" href="/forgot-password">Forgot password?</a>
           </form>
 
           <form id="createAccountForm" class="auth-card">
@@ -244,26 +244,6 @@
             <button type="submit">Create Account</button>
             <p id="createAccountStatus" class="download-status" aria-live="polite"></p>
           </form>
-
-          <form id="forgotPasswordForm" class="auth-card is-hidden">
-            <h2>Reset Password</h2>
-            <label>
-              Verify email address
-              <input id="resetEmail" type="email" autocomplete="email" required />
-            </label>
-            <button type="submit">Send Reset Link</button>
-            <p id="forgotPasswordStatus" class="download-status" aria-live="polite"></p>
-          </form>
-
-          <form id="resetPasswordForm" class="auth-card is-hidden">
-            <h2>Choose New Password</h2>
-            <label>
-              New password
-              <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required />
-            </label>
-            <button type="submit">Update Password</button>
-            <p id="resetPasswordStatus" class="download-status" aria-live="polite"></p>
-          </form>
         </section>
 
         <section id="accountPanel" class="account-panel is-hidden">
@@ -275,6 +255,54 @@
             </div>
             <button id="signOutButton" type="button" class="secondary">Sign Out</button>
           </div>
+        </section>
+      </section>
+
+      <section id="forgotPasswordPage" class="page auth-page is-hidden" aria-label="Forgot password">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Account Recovery</p>
+            <h1>Reset Password</h1>
+            <p>Enter your account email and we will send a secure reset link if the account exists.</p>
+          </div>
+        </header>
+
+        <section class="auth-single">
+          <form id="forgotPasswordForm" class="auth-card">
+            <h2>Reset Password</h2>
+            <label>
+              Email address
+              <input id="resetEmail" type="email" autocomplete="email" required />
+            </label>
+            <button type="submit">Send Reset Link</button>
+            <p id="forgotPasswordStatus" class="download-status" aria-live="polite"></p>
+          </form>
+        </section>
+      </section>
+
+      <section id="resetPasswordPage" class="page auth-page is-hidden" aria-label="Reset password">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Account Recovery</p>
+            <h1>Update Password</h1>
+            <p>Choose a new password for your account.</p>
+          </div>
+        </header>
+
+        <section class="auth-single">
+          <form id="resetPasswordForm" class="auth-card">
+            <h2>Choose New Password</h2>
+            <label>
+              New password
+              <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+            <label>
+              Confirm password
+              <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+            <button type="submit">Update Password</button>
+            <p id="resetPasswordStatus" class="download-status" aria-live="polite"></p>
+          </form>
         </section>
       </section>
 

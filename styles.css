@@ -585,6 +585,23 @@ button.link-button {
   margin: 0 auto;
 }
 
+.auth-single {
+  width: min(560px, 100%);
+  margin: 0 auto;
+}
+
+.auth-link {
+  justify-self: start;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
 .auth-card,
 .account-panel,
 .admin-panel {

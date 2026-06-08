@@ -25,6 +25,8 @@ const els = {
   convertPage: document.querySelector("#convertPage"),
   subscriptionPage: document.querySelector("#subscriptionPage"),
   signInPage: document.querySelector("#signInPage"),
+  forgotPasswordPage: document.querySelector("#forgotPasswordPage"),
+  resetPasswordPage: document.querySelector("#resetPasswordPage"),
   entryPage: document.querySelector("#entryPage"),
   reviewPage: document.querySelector("#reviewPage"),
   checklist: document.querySelector("#checklist"),
@@ -64,12 +66,13 @@ const els = {
   createEmail: document.querySelector("#createEmail"),
   createPassword: document.querySelector("#createPassword"),
   createAccountStatus: document.querySelector("#createAccountStatus"),
-  forgotPasswordOpen: document.querySelector("#forgotPasswordOpen"),
+  forgotPasswordLink: document.querySelector("#forgotPasswordLink"),
   forgotPasswordForm: document.querySelector("#forgotPasswordForm"),
   resetEmail: document.querySelector("#resetEmail"),
   forgotPasswordStatus: document.querySelector("#forgotPasswordStatus"),
   resetPasswordForm: document.querySelector("#resetPasswordForm"),
   newPassword: document.querySelector("#newPassword"),
+  confirmPassword: document.querySelector("#confirmPassword"),
   resetPasswordStatus: document.querySelector("#resetPasswordStatus"),
   accountPanel: document.querySelector("#accountPanel"),
   accountName: document.querySelector("#accountName"),
@@ -429,6 +432,8 @@ function showReviewPage(data) {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.remove("is-hidden");
   els.mergeStatus.textContent = "";
@@ -441,6 +446,8 @@ function showEntryPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.entryPage.classList.remove("is-hidden");
   setActiveNav(els.ungateBuilderLink);
@@ -453,6 +460,8 @@ function showLandingPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.landingPage.classList.remove("is-hidden");
   setActiveNav(null);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -464,6 +473,8 @@ function showConvertPage() {
   els.reviewPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.convertPage.classList.remove("is-hidden");
   setActiveNav(els.convertLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -475,6 +486,8 @@ function showSubscriptionPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.subscriptionPage.classList.remove("is-hidden");
   setActiveNav(els.subscriptionLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -486,7 +499,35 @@ function showSignInPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
   els.signInPage.classList.remove("is-hidden");
+  setActiveNav(els.signInLink);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showForgotPasswordPage() {
+  els.landingPage.classList.add("is-hidden");
+  els.entryPage.classList.add("is-hidden");
+  els.reviewPage.classList.add("is-hidden");
+  els.convertPage.classList.add("is-hidden");
+  els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.remove("is-hidden");
+  setActiveNav(els.signInLink);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showResetPasswordPage() {
+  els.landingPage.classList.add("is-hidden");
+  els.entryPage.classList.add("is-hidden");
+  els.reviewPage.classList.add("is-hidden");
+  els.convertPage.classList.add("is-hidden");
+  els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.remove("is-hidden");
   setActiveNav(els.signInLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -494,6 +535,36 @@ function showSignInPage() {
 function setActiveNav(activeLink) {
   [els.ungateBuilderLink, els.convertLink, els.subscriptionLink, els.signInLink].forEach((link) => link?.classList.remove("is-active"));
   activeLink?.classList.add("is-active");
+}
+
+function navigateTo(path) {
+  window.history.pushState(null, "", path);
+  handleRoute();
+}
+
+function handleRoute() {
+  const path = window.location.pathname;
+
+  if (path === "/signin") {
+    showSignInPage();
+    return;
+  }
+
+  if (path === "/forgot-password") {
+    showForgotPasswordPage();
+    return;
+  }
+
+  if (path === "/reset-password") {
+    resetToken = new URLSearchParams(window.location.search).get("token") || "";
+    showResetPasswordPage();
+    els.resetPasswordStatus.textContent = resetToken ? "" : "This password reset link is missing a token.";
+    return;
+  }
+
+  if (path !== "/") {
+    window.history.replaceState(null, "", "/");
+  }
 }
 
 function downloadBlob(bytes, fileName) {
@@ -817,13 +888,10 @@ async function handleSignIn(event) {
       password: els.signInPassword.value
     });
     els.signInForm.reset();
-    els.forgotPasswordOpen.classList.add("is-hidden");
-    els.forgotPasswordForm.classList.add("is-hidden");
     els.signInStatus.textContent = "Signed in.";
     renderAccount(payload.user);
   } catch (error) {
-    els.signInStatus.textContent = error.message;
-    els.forgotPasswordOpen.classList.remove("is-hidden");
+    els.signInStatus.textContent = "Invalid email or password.";
     els.resetEmail.value = els.signInEmail.value;
   }
 }
@@ -852,13 +920,9 @@ async function signOut() {
   } finally {
     renderAccount(null);
     els.signInStatus.textContent = "Signed out.";
+    window.history.replaceState(null, "", "/signin");
     showSignInPage();
   }
-}
-
-function showForgotPasswordForm() {
-  els.forgotPasswordForm.classList.remove("is-hidden");
-  els.forgotPasswordStatus.textContent = "";
 }
 
 async function requestPasswordReset(event) {
@@ -869,7 +933,7 @@ async function requestPasswordReset(event) {
     const payload = await postJson("/api/auth/request-password-reset", {
       email: els.resetEmail.value
     });
-    els.forgotPasswordStatus.textContent = payload.message || "If an account exists, a reset link has been sent.";
+    els.forgotPasswordStatus.textContent = payload.message || "If this email exists, a password reset link has been sent.";
   } catch (error) {
     els.forgotPasswordStatus.textContent = error.message;
   }
@@ -879,30 +943,34 @@ async function resetPassword(event) {
   event.preventDefault();
   els.resetPasswordStatus.textContent = "Updating password...";
 
+  if (!resetToken) {
+    els.resetPasswordStatus.textContent = "This password reset link is missing a token.";
+    return;
+  }
+
+  if (els.newPassword.value !== els.confirmPassword.value) {
+    els.resetPasswordStatus.textContent = "Passwords do not match.";
+    return;
+  }
+
+  if (els.newPassword.value.length < 8) {
+    els.resetPasswordStatus.textContent = "Password must be at least 8 characters.";
+    return;
+  }
+
   try {
     const payload = await postJson("/api/auth/reset-password", {
       token: resetToken,
       password: els.newPassword.value
     });
     els.resetPasswordForm.reset();
-    els.resetPasswordStatus.textContent = payload.message || "Password updated.";
     resetToken = "";
-    window.history.replaceState(null, "", "#account");
-    els.forgotPasswordOpen.classList.add("is-hidden");
+    window.history.replaceState(null, "", "/signin");
+    showSignInPage();
+    els.signInStatus.textContent = payload.message || "Password updated successfully. Please sign in.";
   } catch (error) {
     els.resetPasswordStatus.textContent = error.message;
   }
-}
-
-function handleResetPasswordLink() {
-  const hash = window.location.hash || "";
-  if (!hash.startsWith("#reset-password")) return;
-  const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
-  resetToken = new URLSearchParams(query).get("token") || "";
-  if (!resetToken) return;
-  showSignInPage();
-  els.resetPasswordForm.classList.remove("is-hidden");
-  els.resetPasswordStatus.textContent = "Enter a new password to complete the reset.";
 }
 
 els.buildPacket.addEventListener("click", () => {
@@ -929,7 +997,7 @@ els.subscriptionLink.addEventListener("click", (event) => {
 });
 els.signInLink.addEventListener("click", (event) => {
   event.preventDefault();
-  showSignInPage();
+  navigateTo("/signin");
 });
 els.viewSubscription.addEventListener("click", (event) => {
   event.preventDefault();
@@ -939,7 +1007,11 @@ els.startBuilder.addEventListener("click", showEntryPage);
 els.signInForm.addEventListener("submit", handleSignIn);
 els.createAccountForm.addEventListener("submit", handleCreateAccount);
 els.signOutButton.addEventListener("click", signOut);
-els.forgotPasswordOpen.addEventListener("click", showForgotPasswordForm);
+els.forgotPasswordLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  els.resetEmail.value = els.signInEmail.value;
+  navigateTo("/forgot-password");
+});
 els.forgotPasswordForm.addEventListener("submit", requestPasswordReset);
 els.resetPasswordForm.addEventListener("submit", resetPassword);
 els.convertWord.addEventListener("click", convertWordToPdf);
@@ -961,4 +1033,5 @@ buildPacket();
 updateConverterLists();
 setupDragAndDrop();
 checkCurrentUser();
-handleResetPasswordLink();
+handleRoute();
+window.addEventListener("popstate", handleRoute);

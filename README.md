@@ -59,7 +59,7 @@ SMTP_FROM=your_from_email
 NODE_ENV=production
 ```
 
-The master account is created privately by the server and is not displayed on the public website. Password reset links are emailed through the SMTP settings above and expire after 60 minutes.
+The master account is created privately by the server and is not displayed on the public website. Password reset links are emailed through the SMTP settings above, use `/reset-password?token=...`, and expire after 30 minutes.
 
 ## Local Development
 

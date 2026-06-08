@@ -13,10 +13,13 @@ const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
 const sessionCookieName = "a2z_session";
 const sessionDays = 14;
-const resetTokenMinutes = 60;
+const resetTokenMinutes = 30;
+const resetRequestLimit = 5;
+const resetRateWindowMs = 15 * 60 * 1000;
 
 let dbPool = null;
 let dbReady = false;
+const resetRequestBuckets = new Map();
 
 const pageSize = {
   width: 612,
@@ -185,6 +188,27 @@ function getPublicBaseUrl(request) {
   const proto = request.headers["x-forwarded-proto"] || (process.env.NODE_ENV === "production" ? "https" : "http");
   const requestHost = request.headers["x-forwarded-host"] || request.headers.host || `${host}:${port}`;
   return `${proto}://${requestHost}`;
+}
+
+function getClientIp(request) {
+  return String(request.headers["x-forwarded-for"] || request.socket.remoteAddress || "unknown")
+    .split(",")[0]
+    .trim();
+}
+
+function checkResetRateLimit(request, email) {
+  const now = Date.now();
+  const key = `${getClientIp(request)}:${email}`;
+  const bucket = resetRequestBuckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    resetRequestBuckets.set(key, { count: 1, resetAt: now + resetRateWindowMs });
+    return true;
+  }
+
+  if (bucket.count >= resetRequestLimit) return false;
+  bucket.count += 1;
+  return true;
 }
 
 function hasSmtpConfig() {
@@ -383,10 +407,15 @@ async function handlePasswordResetRequest(request, response) {
   try {
     const payload = await readJsonBody(request);
     const email = normalizeEmail(payload.email);
-    const neutralMessage = "If an active account exists for that email, a password reset link has been sent.";
+    const neutralMessage = "If this email exists, a password reset link has been sent.";
 
     if (!email) {
       sendJson(response, 400, { error: "Email address is required." });
+      return;
+    }
+
+    if (!checkResetRateLimit(request, email)) {
+      sendJson(response, 429, { error: "Too many password reset requests. Please wait and try again." });
       return;
     }
 
@@ -394,6 +423,12 @@ async function handlePasswordResetRequest(request, response) {
     const user = rows[0];
 
     if (user?.status === "active") {
+      if (!hasSmtpConfig()) {
+        console.error("Password reset SMTP is not configured.");
+        sendJson(response, 503, { error: "Password reset email service is not configured. Please contact support." });
+        return;
+      }
+
       const token = randomBytes(32).toString("hex");
       const tokenHash = hashToken(token);
       const expiresAt = new Date(Date.now() + resetTokenMinutes * 60 * 1000);
@@ -402,13 +437,20 @@ async function handlePasswordResetRequest(request, response) {
         { userId: user.id, tokenHash, expiresAt }
       );
 
-      const resetUrl = `${getPublicBaseUrl(request)}/#reset-password?token=${encodeURIComponent(token)}`;
-      await sendPasswordResetEmail(user.email, resetUrl);
+      const resetUrl = `${getPublicBaseUrl(request)}/reset-password?token=${encodeURIComponent(token)}`;
+      try {
+        await sendPasswordResetEmail(user.email, resetUrl);
+      } catch (error) {
+        console.error(`Password reset email failed: ${error.message}`);
+        sendJson(response, 503, { error: "Password reset email service is not configured. Please contact support." });
+        return;
+      }
     }
 
     sendJson(response, 200, { message: neutralMessage });
   } catch (error) {
-    sendJson(response, 500, { error: `Could not send password reset email: ${error.message}` });
+    console.error(`Password reset request failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not send password reset email. Please contact support." });
   }
 }
 
@@ -459,9 +501,10 @@ async function handlePasswordReset(request, response) {
     await dbPool.execute("UPDATE password_resets SET used_at = NOW() WHERE id = :id", { id: reset.id });
     await dbPool.execute("DELETE FROM sessions WHERE user_id = :userId", { userId: reset.user_id });
 
-    sendJson(response, 200, { message: "Password updated. Please sign in with your new password." });
+    sendJson(response, 200, { message: "Password updated successfully. Please sign in." });
   } catch (error) {
-    sendJson(response, 500, { error: `Could not reset password: ${error.message}` });
+    console.error(`Password reset failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not reset password. Please contact support." });
   }
 }
 
@@ -944,7 +987,8 @@ async function handleMasterPdfGeneration(request, response) {
 }
 
 function getSafeStaticPath(pathname) {
-  const requested = pathname === "/" ? "/index.html" : pathname;
+  const appRoutes = new Set(["/", "/signin", "/forgot-password", "/reset-password"]);
+  const requested = appRoutes.has(pathname) ? "/index.html" : pathname;
   const filePath = normalize(join(root, requested));
   const rootWithSeparator = root.endsWith(sep) ? root : `${root}${sep}`;
   return filePath === root || filePath.startsWith(rootWithSeparator) ? filePath : null;
