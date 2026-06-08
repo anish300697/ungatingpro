@@ -25,6 +25,7 @@ const els = {
   convertPage: document.querySelector("#convertPage"),
   subscriptionPage: document.querySelector("#subscriptionPage"),
   paymentPage: document.querySelector("#paymentPage"),
+  dashboardPage: document.querySelector("#dashboardPage"),
   signInPage: document.querySelector("#signInPage"),
   forgotPasswordPage: document.querySelector("#forgotPasswordPage"),
   resetPasswordPage: document.querySelector("#resetPasswordPage"),
@@ -45,10 +46,14 @@ const els = {
   printPacket: document.querySelector("#printPacket"),
   editPacket: document.querySelector("#editPacket"),
   homeLink: document.querySelector("#homeLink"),
-  ungateBuilderLink: document.querySelector("#ungateBuilderLink"),
   convertLink: document.querySelector("#convertLink"),
   subscriptionLink: document.querySelector("#subscriptionLink"),
+  dashboardLink: document.querySelector("#dashboardLink"),
+  paymentLink: document.querySelector("#paymentLink"),
+  adminLink: document.querySelector("#adminLink"),
   signInLink: document.querySelector("#signInLink"),
+  createAccountLink: document.querySelector("#createAccountLink"),
+  navSignOutButton: document.querySelector("#navSignOutButton"),
   viewSubscription: document.querySelector("#viewSubscription"),
   startBuilder: document.querySelector("#startBuilder"),
   wordFileList: document.querySelector("#wordFileList"),
@@ -88,7 +93,10 @@ const els = {
   applyCoupon: document.querySelector("#applyCoupon"),
   paymentFinalTotal: document.querySelector("#paymentFinalTotal"),
   paymentStatus: document.querySelector("#paymentStatus"),
-  continuePayment: document.querySelector("#continuePayment")
+  continuePayment: document.querySelector("#continuePayment"),
+  dashboardBuilder: document.querySelector("#dashboardBuilder"),
+  dashboardUpgrade: document.querySelector("#dashboardUpgrade"),
+  dashboardAccessStatus: document.querySelector("#dashboardAccessStatus")
 };
 
 let fileUrls = [];
@@ -445,6 +453,7 @@ function showReviewPage(data) {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -460,12 +469,13 @@ function showEntryPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.entryPage.classList.remove("is-hidden");
-  setActiveNav(els.ungateBuilderLink);
+  setActiveNav(els.dashboardLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -475,6 +485,7 @@ function showLandingPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -489,6 +500,7 @@ function showConvertPage() {
   els.reviewPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -503,6 +515,7 @@ function showSubscriptionPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -518,6 +531,7 @@ function showSignInPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.signInPage.classList.remove("is-hidden");
@@ -532,6 +546,7 @@ function showForgotPasswordPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.remove("is-hidden");
@@ -546,6 +561,7 @@ function showResetPasswordPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.paymentPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.remove("is-hidden");
@@ -560,6 +576,7 @@ function showPaymentPage() {
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
+  els.dashboardPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.paymentPage.classList.remove("is-hidden");
@@ -568,8 +585,28 @@ function showPaymentPage() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function showDashboardPage() {
+  els.landingPage.classList.add("is-hidden");
+  els.entryPage.classList.add("is-hidden");
+  els.reviewPage.classList.add("is-hidden");
+  els.convertPage.classList.add("is-hidden");
+  els.subscriptionPage.classList.add("is-hidden");
+  els.paymentPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
+  els.dashboardPage.classList.remove("is-hidden");
+  setActiveNav(els.dashboardLink);
+  els.dashboardAccessStatus.textContent = userHasActiveAccess()
+    ? `Full access active${currentUser?.planType ? ` (${currentUser.planType})` : ""}.`
+    : "No active subscription yet. Apply a coupon or upgrade to unlock premium tools.";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function setActiveNav(activeLink) {
-  [els.ungateBuilderLink, els.convertLink, els.subscriptionLink, els.signInLink].forEach((link) => link?.classList.remove("is-active"));
+  [els.convertLink, els.subscriptionLink, els.dashboardLink, els.paymentLink, els.adminLink, els.signInLink, els.createAccountLink].forEach((link) =>
+    link?.classList.remove("is-active")
+  );
   activeLink?.classList.add("is-active");
 }
 
@@ -598,7 +635,6 @@ function openProtectedBuilder() {
 }
 
 function openProtectedConvert() {
-  if (!requireActiveAccessFor("/convert")) return;
   showConvertPage();
 }
 
@@ -620,18 +656,24 @@ function handleRoute() {
     return;
   }
 
+  if (path === "/create-account") {
+    showSignInPage();
+    els.createEmail.focus();
+    setActiveNav(els.createAccountLink);
+    return;
+  }
+
   if (path === "/forgot-password") {
     showForgotPasswordPage();
     return;
   }
 
   if (path === "/payment") {
-    if (!requireSignInFor("/payment")) return;
     showPaymentPage();
     return;
   }
 
-  if (path === "/subscription") {
+  if (path === "/subscription" || path === "/pricing") {
     showSubscriptionPage();
     return;
   }
@@ -649,7 +691,35 @@ function handleRoute() {
   }
 
   if (path === "/convert") {
-    openProtectedConvert();
+    showConvertPage();
+    return;
+  }
+
+  if (path === "/dashboard") {
+    if (!requireSignInFor("/dashboard")) return;
+    showDashboardPage();
+    return;
+  }
+
+  if (["/account", "/history"].includes(path)) {
+    if (!requireSignInFor(path)) return;
+    showDashboardPage();
+    return;
+  }
+
+  if (path === "/admin") {
+    if (!requireSignInFor(path)) return;
+    if (currentUser?.role !== "admin" && !currentUser?.isMaster) {
+      showDashboardPage();
+      return;
+    }
+    showDashboardPage();
+    return;
+  }
+
+  if (["/premium-tools", "/generate-package"].includes(path)) {
+    if (!requireActiveAccessFor(path)) return;
+    showEntryPage();
     return;
   }
 
@@ -809,8 +879,6 @@ async function buildWordPdfBytesWithBackend(files) {
 }
 
 async function convertPhotosToPdf() {
-  if (!requireActiveAccessFor("/convert")) return;
-
   const files = Array.from(fields.photoFiles.files || []);
   if (!files.length) {
     els.photoConvertStatus.textContent = "Choose one or more JPG, PNG, or HEIC photos first.";
@@ -831,8 +899,6 @@ async function convertPhotosToPdf() {
 }
 
 async function convertWordToPdf() {
-  if (!requireActiveAccessFor("/convert")) return;
-
   const files = Array.from(fields.wordFiles.files || []);
   if (!files.length) {
     els.wordConvertStatus.textContent = "Choose one or more Word documents first.";
@@ -953,6 +1019,18 @@ async function parseJsonResponse(response) {
 
 function renderAccount(user) {
   currentUser = user;
+  const isSignedIn = Boolean(user);
+  const isAdmin = Boolean(user?.isMaster || user?.role === "admin");
+
+  els.dashboardLink?.classList.toggle("is-hidden", !isSignedIn);
+  els.paymentLink?.classList.toggle("is-hidden", !isSignedIn || isAdmin);
+  els.navSignOutButton?.classList.toggle("is-hidden", !isSignedIn);
+  els.adminLink?.classList.toggle("is-hidden", !isAdmin);
+  els.signInLink?.classList.toggle("is-hidden", isSignedIn);
+  els.createAccountLink?.classList.toggle("is-hidden", isSignedIn);
+  els.subscriptionLink?.classList.toggle("is-hidden", isSignedIn);
+  els.paymentLink.textContent = userHasActiveAccess() ? "Payment" : "Upgrade";
+
   if (!user) {
     els.accountPanel.classList.add("is-hidden");
     els.signInLink.textContent = "Sign In";
@@ -1024,12 +1102,15 @@ async function handleCreateAccount(event) {
 
 async function signOut() {
   try {
-    await postJson("/api/auth/sign-out");
+    await postJson("/api/auth/logout");
   } finally {
     selectedPlan = null;
     pendingProtectedPath = "";
+    currentUser = null;
+    sessionStorage.clear();
     sessionStorage.removeItem("selectedPlan");
     sessionStorage.removeItem("pendingProtectedPath");
+    localStorage.removeItem("a2z_session");
     localStorage.removeItem("authToken");
     localStorage.removeItem("selectedPlan");
     renderAccount(null);
@@ -1130,18 +1211,35 @@ function renderPaymentPage() {
 
 function choosePlan(planType) {
   setSelectedPlan(planType);
-  if (!requireSignInFor("/payment")) return;
   navigateTo("/payment");
 }
 
 async function applyCoupon() {
   if (!selectedPlan) setSelectedPlan("monthly");
   els.paymentStatus.textContent = "Applying coupon...";
+  const code = els.couponCode.value.trim();
+
+  if (code.toUpperCase() === "FREEALL") {
+    if (!requireSignInFor("/payment")) return;
+    try {
+      const payload = await postJson("/api/apply-coupon", { code });
+      if (!payload.success) {
+        els.paymentStatus.textContent = payload.message || "Invalid coupon code.";
+        return;
+      }
+      els.paymentStatus.textContent = "Coupon applied successfully. Full access unlocked.";
+      await checkCurrentUser();
+      window.setTimeout(() => navigateTo("/dashboard"), 500);
+    } catch (error) {
+      els.paymentStatus.textContent = error.message;
+    }
+    return;
+  }
 
   try {
     const payload = await postJson("/api/subscription/validate-coupon", {
       planType: selectedPlan.planType,
-      couponCode: els.couponCode.value
+      couponCode: code
     });
     selectedPlan = payload;
     sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
@@ -1182,27 +1280,38 @@ els.homeLink.addEventListener("click", (event) => {
   event.preventDefault();
   showLandingPage();
 });
-els.ungateBuilderLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  window.history.pushState(null, "", "/builder");
-  openProtectedBuilder();
-});
 els.convertLink.addEventListener("click", (event) => {
   event.preventDefault();
   window.history.pushState(null, "", "/convert");
-  openProtectedConvert();
+  showConvertPage();
 });
 els.subscriptionLink.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("/subscription");
+  navigateTo("/pricing");
+});
+els.dashboardLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("/dashboard");
+});
+els.paymentLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("/payment");
+});
+els.adminLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("/admin");
 });
 els.signInLink.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("/signin");
 });
+els.createAccountLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo("/create-account");
+});
 els.viewSubscription.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("/subscription");
+  navigateTo("/pricing");
 });
 els.startBuilder.addEventListener("click", () => {
   window.history.pushState(null, "", "/builder");
@@ -1215,6 +1324,9 @@ els.continuePayment.addEventListener("click", continueToPayment);
 els.signInForm.addEventListener("submit", handleSignIn);
 els.createAccountForm.addEventListener("submit", handleCreateAccount);
 els.signOutButton.addEventListener("click", signOut);
+els.navSignOutButton.addEventListener("click", signOut);
+els.dashboardBuilder.addEventListener("click", openProtectedBuilder);
+els.dashboardUpgrade.addEventListener("click", () => navigateTo("/payment"));
 els.forgotPasswordLink.addEventListener("click", (event) => {
   event.preventDefault();
   els.resetEmail.value = els.signInEmail.value;

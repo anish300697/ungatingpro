@@ -75,6 +75,7 @@ Initial coupon codes:
 - `LAUNCH10`: 10% off
 - `BETA25`: 25% off
 - `YEARLY50`: $50 off yearly plan only
+- `FREEALL`: grants full access for the signed-in user without Stripe and records the payment status as `coupon`
 
 Stripe checkout is not active yet. The payment page records pending payment attempts in the database and shows a safe `Stripe integration pending` message until Stripe keys and checkout creation are added.
 

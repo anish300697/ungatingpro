@@ -126,7 +126,11 @@ async function initDatabase() {
       status VARCHAR(32) NOT NULL DEFAULT 'active',
       is_master TINYINT(1) NOT NULL DEFAULT 0,
       subscription_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
+      plan VARCHAR(32) NULL,
       plan_type VARCHAR(32) NULL,
+      payment_status VARCHAR(32) NULL,
+      has_full_access TINYINT(1) NOT NULL DEFAULT 0,
+      access_expires_at DATETIME NULL,
       subscription_started_at DATETIME NULL,
       subscription_expires_at DATETIME NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -179,7 +183,11 @@ async function initDatabase() {
 async function ensureUserSubscriptionColumns() {
   const columns = [
     ["subscription_status", "VARCHAR(32) NOT NULL DEFAULT 'inactive'"],
+    ["plan", "VARCHAR(32) NULL"],
     ["plan_type", "VARCHAR(32) NULL"],
+    ["payment_status", "VARCHAR(32) NULL"],
+    ["has_full_access", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["access_expires_at", "DATETIME NULL"],
     ["subscription_started_at", "DATETIME NULL"],
     ["subscription_expires_at", "DATETIME NULL"]
   ];
@@ -234,9 +242,12 @@ function publicUser(user) {
     status: user.status,
     isMaster: Boolean(user.is_master),
     subscriptionStatus: user.subscription_status || "inactive",
-    planType: user.plan_type || null,
+    plan: user.plan || user.plan_type || null,
+    planType: user.plan_type || user.plan || null,
+    paymentStatus: user.payment_status || null,
+    hasFullAccess: Boolean(user.has_full_access),
     subscriptionStartedAt: user.subscription_started_at || null,
-    subscriptionExpiresAt: user.subscription_expires_at || null,
+    subscriptionExpiresAt: user.subscription_expires_at || user.access_expires_at || null,
     hasActiveAccess: hasActiveAccess(user)
   };
 }
@@ -244,6 +255,8 @@ function publicUser(user) {
 function hasActiveAccess(user) {
   if (!user) return false;
   if (user.is_master || user.role === "admin") return true;
+  if (user.has_full_access) return true;
+  if (user.plan === "free_all" || user.plan_type === "free_all") return true;
   const status = user.subscription_status;
   const activeStatus = status === "active" || status === "trial";
   if (!activeStatus) return false;
@@ -352,6 +365,11 @@ function getCookieHeader(request, token) {
 function getClearCookieHeader(request) {
   const secure = request.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
   return `${sessionCookieName}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+function getClearTokenCookieHeader(request) {
+  const secure = request.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+  return `token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 async function createSession(userId) {
@@ -487,7 +505,7 @@ async function handleSignOut(request, response) {
     const token = parseCookies(request)[sessionCookieName];
     if (token) await dbPool.execute("DELETE FROM sessions WHERE id = :token", { token });
   }
-  sendJsonWithHeaders(response, 200, { ok: true }, { "Set-Cookie": getClearCookieHeader(request) });
+  sendJsonWithHeaders(response, 200, { success: true }, { "Set-Cookie": [getClearCookieHeader(request), getClearTokenCookieHeader(request)] });
 }
 
 async function handlePasswordResetRequest(request, response) {
@@ -727,6 +745,53 @@ async function handleCreateCheckout(request, response) {
   }
 }
 
+async function handleApplyCoupon(request, response) {
+  const user = await requireSignedIn(request, response);
+  if (!user) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const code = String(payload.code || "").trim().toUpperCase();
+
+    if (code !== "FREEALL") {
+      sendJson(response, 400, { success: false, message: "Invalid coupon code." });
+      return;
+    }
+
+    await dbPool.execute(
+      `
+        UPDATE users
+        SET subscription_status = 'active',
+            plan = 'free_all',
+            plan_type = 'free_all',
+            payment_status = 'coupon',
+            has_full_access = 1,
+            access_expires_at = NULL,
+            subscription_started_at = COALESCE(subscription_started_at, NOW()),
+            subscription_expires_at = NULL
+        WHERE id = :userId
+      `,
+      { userId: user.id }
+    );
+
+    await dbPool.execute(
+      `
+        INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
+        VALUES (:userId, 'free_all', 'FREEALL', 0, 0, 'coupon')
+      `,
+      { userId: user.id }
+    );
+
+    sendJson(response, 200, {
+      success: true,
+      plan: "free_all",
+      access: "full"
+    });
+  } catch (error) {
+    sendJson(response, 500, { success: false, message: "Could not apply coupon." });
+  }
+}
+
 function parseMultipart(buffer, contentType) {
   const boundaryMatch = /boundary=([^;]+)/i.exec(contentType || "");
   if (!boundaryMatch) return [];
@@ -854,9 +919,6 @@ async function appendTextDocument(pdfDoc, title, text) {
 }
 
 async function handleWordConversion(request, response) {
-  const user = await requireActiveAccess(request, response);
-  if (!user) return;
-
   try {
     const body = await readRequestBody(request);
     const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"]));
@@ -944,9 +1006,6 @@ async function appendPhotoPage(pdfDoc, file) {
 }
 
 async function handlePhotoConversion(request, response) {
-  const user = await requireActiveAccess(request, response);
-  if (!user) return;
-
   try {
     const body = await readRequestBody(request);
     const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"])).filter(isSupportedPhoto);
@@ -1171,7 +1230,24 @@ async function handleMasterPdfGeneration(request, response) {
 }
 
 function getSafeStaticPath(pathname) {
-  const appRoutes = new Set(["/", "/signin", "/forgot-password", "/reset-password", "/builder", "/convert", "/subscription", "/payment"]);
+  const appRoutes = new Set([
+    "/",
+    "/convert",
+    "/signin",
+    "/create-account",
+    "/forgot-password",
+    "/reset-password",
+    "/pricing",
+    "/subscription",
+    "/payment",
+    "/builder",
+    "/dashboard",
+    "/account",
+    "/history",
+    "/admin",
+    "/premium-tools",
+    "/generate-package"
+  ]);
   const requested = appRoutes.has(pathname) ? "/index.html" : pathname;
   const filePath = normalize(join(root, requested));
   const rootWithSeparator = root.endsWith(sep) ? root : `${root}${sep}`;
@@ -1216,7 +1292,7 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/auth/sign-out") {
+  if (request.method === "POST" && (url.pathname === "/api/auth/sign-out" || url.pathname === "/api/auth/logout")) {
     await handleSignOut(request, response);
     return;
   }
@@ -1238,6 +1314,11 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/subscription/create-checkout") {
     await handleCreateCheckout(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/apply-coupon") {
+    await handleApplyCoupon(request, response);
     return;
   }
 
