@@ -600,19 +600,27 @@ function openBuilder() {
   if (!currentUser) {
     builderRequestedAfterLogin = true;
     sessionStorage.setItem("builderRequestedAfterLogin", "true");
-    window.history.pushState(null, "", "/signin");
-    showSignInPage();
+    navigateTo("/signin?redirect=builder");
     els.signInStatus.textContent = "Please sign in to use Ungate Builder.";
     return;
   }
 
   if (!hasActiveSubscription()) {
-    window.history.pushState(null, "", "/pricing");
-    showSubscriptionPage("An active subscription is required to use Ungate Builder.");
+    navigateTo("/subscription?redirect=builder");
     return;
   }
 
   showEntryPage();
+}
+
+function getRedirectTarget() {
+  return new URLSearchParams(window.location.search).get("redirect") || "";
+}
+
+function getBuilderDestination() {
+  if (!currentUser) return "/signin?redirect=builder";
+  if (!hasActiveSubscription()) return "/subscription?redirect=builder";
+  return "/builder";
 }
 
 function navigateTo(path) {
@@ -628,7 +636,7 @@ function handleRoute() {
     return;
   }
 
-  if (path === "/signin") {
+  if (path === "/signin" || path === "/account") {
     showSignInPage();
     return;
   }
@@ -638,16 +646,18 @@ function handleRoute() {
     return;
   }
 
-  if (path === "/subscription" || path === "/pricing") {
-    showSubscriptionPage();
+  if (path === "/subscription") {
+    const message = getRedirectTarget() === "builder" && currentUser && !hasActiveSubscription()
+      ? "An active subscription is required to use Ungate Builder."
+      : "";
+    showSubscriptionPage(message);
     return;
   }
 
   if (path === "/coupon") {
-    if (!selectedPlan) {
-      selectedPlan = planDetails.monthly;
-      sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
-    }
+    const planType = new URLSearchParams(window.location.search).get("plan");
+    selectedPlan = planDetails[planType] || selectedPlan || planDetails.monthly;
+    sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
     showCouponPage();
     return;
   }
@@ -971,6 +981,7 @@ function renderAccount(user) {
   if (!user) {
     els.accountPanel.classList.add("is-hidden");
     els.signInLink.textContent = "Sign In";
+    els.signInLink.href = "/signin";
     return;
   }
 
@@ -978,6 +989,7 @@ function renderAccount(user) {
   els.accountName.textContent = user.name || "Account";
   els.accountEmail.textContent = user.email || "";
   els.signInLink.textContent = "Account";
+  els.signInLink.href = "/account";
 }
 
 async function checkCurrentUser() {
@@ -1012,7 +1024,17 @@ function continueAfterAuth(user) {
   if (couponRequestedAfterLogin || sessionStorage.getItem("couponRequestedAfterLogin") === "true") {
     couponRequestedAfterLogin = false;
     sessionStorage.removeItem("couponRequestedAfterLogin");
-    navigateTo("/coupon");
+    const planType = selectedPlan?.planType || "monthly";
+    navigateTo(`/coupon?plan=${encodeURIComponent(planType)}&redirect=builder`);
+    return;
+  }
+
+  if (getRedirectTarget() === "builder") {
+    if (hasActiveSubscription(user)) {
+      navigateTo("/builder");
+    } else {
+      navigateTo("/subscription?redirect=builder");
+    }
     return;
   }
 
@@ -1022,7 +1044,7 @@ function continueAfterAuth(user) {
     if (hasActiveSubscription(user)) {
       navigateTo("/builder");
     } else {
-      navigateTo("/pricing");
+      navigateTo("/subscription?redirect=builder");
       els.subscriptionStatus.textContent = "An active subscription is required to use Ungate Builder.";
     }
   }
@@ -1078,14 +1100,15 @@ function selectSubscriptionPlan(planType) {
   els.couponCode.value = "";
   els.couponStatus.textContent = "";
   els.continuePayment.disabled = true;
-  navigateTo("/coupon");
+  const redirect = getRedirectTarget() === "builder" ? "&redirect=builder" : "";
+  navigateTo(`/coupon?plan=${encodeURIComponent(selectedPlan.planType)}${redirect}`);
 }
 
 async function applyCouponCode() {
   if (!currentUser) {
     couponRequestedAfterLogin = true;
     sessionStorage.setItem("couponRequestedAfterLogin", "true");
-    navigateTo("/signin");
+    navigateTo("/signin?redirect=builder");
     els.signInStatus.textContent = "Please sign in before applying a subscription coupon.";
     return;
   }
@@ -1107,6 +1130,7 @@ async function applyCouponCode() {
     els.continuePayment.disabled = false;
     els.couponStatus.textContent = payload.message || "Coupon applied successfully. Your subscription is now active.";
     await checkCurrentUser();
+    navigateTo("/builder");
   } catch (error) {
     couponApplied = false;
     els.continuePayment.disabled = true;
@@ -1169,7 +1193,7 @@ async function resetPassword(event) {
 
 els.buildPacket.addEventListener("click", () => {
   if (!hasActiveSubscription()) {
-    navigateTo(currentUser ? "/pricing" : "/signin");
+    navigateTo(getBuilderDestination());
     if (currentUser) {
       els.subscriptionStatus.textContent = "An active subscription is required to use Ungate Builder.";
     } else {
@@ -1184,16 +1208,19 @@ els.printPacket.addEventListener("click", downloadPacketPdf);
 els.editPacket.addEventListener("click", openBuilder);
 els.homeLink.addEventListener("click", (event) => {
   event.preventDefault();
-  showLandingPage();
+  navigateTo("/");
+});
+els.ungateBuilderLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  navigateTo(getBuilderDestination());
 });
 els.convertLink.addEventListener("click", (event) => {
   event.preventDefault();
-  window.history.pushState(null, "", "/convert");
-  showConvertPage();
+  navigateTo("/convert");
 });
 els.subscriptionLink.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("/pricing");
+  navigateTo("/subscription");
 });
 els.chooseMonthly.addEventListener("click", () => selectSubscriptionPlan("monthly"));
 els.chooseYearly.addEventListener("click", () => selectSubscriptionPlan("yearly"));
@@ -1201,15 +1228,14 @@ els.applyCoupon.addEventListener("click", applyCouponCode);
 els.continuePayment.addEventListener("click", continueAfterCoupon);
 els.signInLink.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("/signin");
+  navigateTo(currentUser ? "/account" : "/signin");
 });
 els.viewSubscription.addEventListener("click", (event) => {
   event.preventDefault();
-  navigateTo("/pricing");
+  navigateTo("/subscription");
 });
 els.startBuilder.addEventListener("click", () => {
-  window.history.pushState(null, "", "/builder");
-  openBuilder();
+  navigateTo(getBuilderDestination());
 });
 els.signInForm.addEventListener("submit", handleSignIn);
 els.createAccountForm.addEventListener("submit", handleCreateAccount);
