@@ -1175,9 +1175,6 @@ async function appendMasterFile(pdfDoc, file) {
 }
 
 async function handleMasterPdfGeneration(request, response) {
-  const user = await requireActiveAccess(request, response);
-  if (!user) return;
-
   try {
     const body = await readRequestBody(request);
     const parts = parseMultipart(body, request.headers["content-type"]);

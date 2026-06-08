@@ -24,8 +24,6 @@ const els = {
   landingPage: document.querySelector("#landingPage"),
   convertPage: document.querySelector("#convertPage"),
   subscriptionPage: document.querySelector("#subscriptionPage"),
-  paymentPage: document.querySelector("#paymentPage"),
-  dashboardPage: document.querySelector("#dashboardPage"),
   signInPage: document.querySelector("#signInPage"),
   forgotPasswordPage: document.querySelector("#forgotPasswordPage"),
   resetPasswordPage: document.querySelector("#resetPasswordPage"),
@@ -46,14 +44,10 @@ const els = {
   printPacket: document.querySelector("#printPacket"),
   editPacket: document.querySelector("#editPacket"),
   homeLink: document.querySelector("#homeLink"),
+  ungateBuilderLink: document.querySelector("#ungateBuilderLink"),
   convertLink: document.querySelector("#convertLink"),
   subscriptionLink: document.querySelector("#subscriptionLink"),
-  dashboardLink: document.querySelector("#dashboardLink"),
-  paymentLink: document.querySelector("#paymentLink"),
-  adminLink: document.querySelector("#adminLink"),
   signInLink: document.querySelector("#signInLink"),
-  createAccountLink: document.querySelector("#createAccountLink"),
-  navSignOutButton: document.querySelector("#navSignOutButton"),
   viewSubscription: document.querySelector("#viewSubscription"),
   startBuilder: document.querySelector("#startBuilder"),
   wordFileList: document.querySelector("#wordFileList"),
@@ -83,28 +77,13 @@ const els = {
   accountPanel: document.querySelector("#accountPanel"),
   accountName: document.querySelector("#accountName"),
   accountEmail: document.querySelector("#accountEmail"),
-  signOutButton: document.querySelector("#signOutButton"),
-  chooseMonthly: document.querySelector("#chooseMonthly"),
-  chooseYearly: document.querySelector("#chooseYearly"),
-  paymentPlanName: document.querySelector("#paymentPlanName"),
-  paymentBillingCycle: document.querySelector("#paymentBillingCycle"),
-  paymentPlanPrice: document.querySelector("#paymentPlanPrice"),
-  couponCode: document.querySelector("#couponCode"),
-  applyCoupon: document.querySelector("#applyCoupon"),
-  paymentFinalTotal: document.querySelector("#paymentFinalTotal"),
-  paymentStatus: document.querySelector("#paymentStatus"),
-  continuePayment: document.querySelector("#continuePayment"),
-  dashboardBuilder: document.querySelector("#dashboardBuilder"),
-  dashboardUpgrade: document.querySelector("#dashboardUpgrade"),
-  dashboardAccessStatus: document.querySelector("#dashboardAccessStatus")
+  signOutButton: document.querySelector("#signOutButton")
 };
 
 let fileUrls = [];
 let packetDocumentOrder = [];
 let currentUser = null;
 let resetToken = "";
-let selectedPlan = JSON.parse(sessionStorage.getItem("selectedPlan") || "null");
-let pendingProtectedPath = sessionStorage.getItem("pendingProtectedPath") || "";
 
 const requiredEvidence = [
   {
@@ -452,8 +431,6 @@ function showReviewPage(data) {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -468,14 +445,12 @@ function showEntryPage() {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.entryPage.classList.remove("is-hidden");
-  setActiveNav(els.dashboardLink);
+  setActiveNav(els.ungateBuilderLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -484,8 +459,6 @@ function showLandingPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -499,8 +472,6 @@ function showConvertPage() {
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -514,8 +485,6 @@ function showSubscriptionPage() {
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -530,8 +499,6 @@ function showSignInPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.signInPage.classList.remove("is-hidden");
@@ -545,8 +512,6 @@ function showForgotPasswordPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.remove("is-hidden");
@@ -560,8 +525,6 @@ function showResetPasswordPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.remove("is-hidden");
@@ -569,73 +532,13 @@ function showResetPasswordPage() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function showPaymentPage() {
-  els.landingPage.classList.add("is-hidden");
-  els.entryPage.classList.add("is-hidden");
-  els.reviewPage.classList.add("is-hidden");
-  els.convertPage.classList.add("is-hidden");
-  els.subscriptionPage.classList.add("is-hidden");
-  els.signInPage.classList.add("is-hidden");
-  els.dashboardPage.classList.add("is-hidden");
-  els.forgotPasswordPage.classList.add("is-hidden");
-  els.resetPasswordPage.classList.add("is-hidden");
-  els.paymentPage.classList.remove("is-hidden");
-  setActiveNav(els.subscriptionLink);
-  renderPaymentPage();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function showDashboardPage() {
-  els.landingPage.classList.add("is-hidden");
-  els.entryPage.classList.add("is-hidden");
-  els.reviewPage.classList.add("is-hidden");
-  els.convertPage.classList.add("is-hidden");
-  els.subscriptionPage.classList.add("is-hidden");
-  els.paymentPage.classList.add("is-hidden");
-  els.signInPage.classList.add("is-hidden");
-  els.forgotPasswordPage.classList.add("is-hidden");
-  els.resetPasswordPage.classList.add("is-hidden");
-  els.dashboardPage.classList.remove("is-hidden");
-  setActiveNav(els.dashboardLink);
-  els.dashboardAccessStatus.textContent = userHasActiveAccess()
-    ? `Full access active${currentUser?.planType ? ` (${currentUser.planType})` : ""}.`
-    : "No active subscription yet. Apply a coupon or upgrade to unlock premium tools.";
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
 function setActiveNav(activeLink) {
-  [els.convertLink, els.subscriptionLink, els.dashboardLink, els.paymentLink, els.adminLink, els.signInLink, els.createAccountLink].forEach((link) =>
-    link?.classList.remove("is-active")
-  );
+  [els.ungateBuilderLink, els.convertLink, els.subscriptionLink, els.signInLink].forEach((link) => link?.classList.remove("is-active"));
   activeLink?.classList.add("is-active");
 }
 
-function userHasActiveAccess() {
-  return Boolean(currentUser?.hasActiveAccess);
-}
-
-function requireSignInFor(path) {
-  if (currentUser) return true;
-  pendingProtectedPath = path;
-  sessionStorage.setItem("pendingProtectedPath", path);
-  navigateTo("/signin");
-  return false;
-}
-
-function requireActiveAccessFor(path) {
-  if (!requireSignInFor(path)) return false;
-  if (userHasActiveAccess()) return true;
-  showSubscriptionPage();
-  return false;
-}
-
-function openProtectedBuilder() {
-  if (!requireActiveAccessFor("/builder")) return;
+function openBuilder() {
   showEntryPage();
-}
-
-function openProtectedConvert() {
-  showConvertPage();
 }
 
 function navigateTo(path) {
@@ -656,20 +559,8 @@ function handleRoute() {
     return;
   }
 
-  if (path === "/create-account") {
-    showSignInPage();
-    els.createEmail.focus();
-    setActiveNav(els.createAccountLink);
-    return;
-  }
-
   if (path === "/forgot-password") {
     showForgotPasswordPage();
-    return;
-  }
-
-  if (path === "/payment") {
-    showPaymentPage();
     return;
   }
 
@@ -686,40 +577,12 @@ function handleRoute() {
   }
 
   if (path === "/builder") {
-    openProtectedBuilder();
+    openBuilder();
     return;
   }
 
   if (path === "/convert") {
     showConvertPage();
-    return;
-  }
-
-  if (path === "/dashboard") {
-    if (!requireSignInFor("/dashboard")) return;
-    showDashboardPage();
-    return;
-  }
-
-  if (["/account", "/history"].includes(path)) {
-    if (!requireSignInFor(path)) return;
-    showDashboardPage();
-    return;
-  }
-
-  if (path === "/admin") {
-    if (!requireSignInFor(path)) return;
-    if (currentUser?.role !== "admin" && !currentUser?.isMaster) {
-      showDashboardPage();
-      return;
-    }
-    showDashboardPage();
-    return;
-  }
-
-  if (["/premium-tools", "/generate-package"].includes(path)) {
-    if (!requireActiveAccessFor(path)) return;
-    showEntryPage();
     return;
   }
 
@@ -978,8 +841,6 @@ async function buildMasterPdfWithBackend(data) {
 }
 
 async function downloadPacketPdf() {
-  if (!requireActiveAccessFor("/builder")) return;
-
   const data = buildPacket({ preserveOrder: true });
   els.downloadStatus.textContent = "Building Ungating_Package.pdf...";
 
@@ -1019,17 +880,6 @@ async function parseJsonResponse(response) {
 
 function renderAccount(user) {
   currentUser = user;
-  const isSignedIn = Boolean(user);
-  const isAdmin = Boolean(user?.isMaster || user?.role === "admin");
-
-  els.dashboardLink?.classList.toggle("is-hidden", !isSignedIn);
-  els.paymentLink?.classList.toggle("is-hidden", !isSignedIn || isAdmin);
-  els.navSignOutButton?.classList.toggle("is-hidden", !isSignedIn);
-  els.adminLink?.classList.toggle("is-hidden", !isAdmin);
-  els.signInLink?.classList.toggle("is-hidden", isSignedIn);
-  els.createAccountLink?.classList.toggle("is-hidden", isSignedIn);
-  els.subscriptionLink?.classList.toggle("is-hidden", isSignedIn);
-  els.paymentLink.textContent = userHasActiveAccess() ? "Payment" : "Upgrade";
 
   if (!user) {
     els.accountPanel.classList.add("is-hidden");
@@ -1064,12 +914,6 @@ async function handleSignIn(event) {
     els.signInForm.reset();
     els.signInStatus.textContent = "Signed in.";
     renderAccount(payload.user);
-    const redirectPath = pendingProtectedPath;
-    pendingProtectedPath = "";
-    sessionStorage.removeItem("pendingProtectedPath");
-    if (redirectPath) {
-      navigateTo(redirectPath);
-    }
   } catch (error) {
     els.signInStatus.textContent = "Invalid email or password.";
     els.resetEmail.value = els.signInEmail.value;
@@ -1089,12 +933,6 @@ async function handleCreateAccount(event) {
     els.createAccountForm.reset();
     els.createAccountStatus.textContent = "Account created.";
     renderAccount(payload.user);
-    const redirectPath = pendingProtectedPath;
-    pendingProtectedPath = "";
-    sessionStorage.removeItem("pendingProtectedPath");
-    if (redirectPath) {
-      navigateTo(redirectPath);
-    }
   } catch (error) {
     els.createAccountStatus.textContent = error.message;
   }
@@ -1104,15 +942,10 @@ async function signOut() {
   try {
     await postJson("/api/auth/logout");
   } finally {
-    selectedPlan = null;
-    pendingProtectedPath = "";
     currentUser = null;
     sessionStorage.clear();
-    sessionStorage.removeItem("selectedPlan");
-    sessionStorage.removeItem("pendingProtectedPath");
     localStorage.removeItem("a2z_session");
     localStorage.removeItem("authToken");
-    localStorage.removeItem("selectedPlan");
     renderAccount(null);
     clearFileUrls();
     fields.proofFiles.value = "";
@@ -1175,107 +1008,12 @@ async function resetPassword(event) {
   }
 }
 
-function planForType(planType) {
-  const planMap = {
-    monthly: { planType: "monthly", planName: "Unlimited Generate", planPrice: 9.99, billingCycle: "Monthly" },
-    yearly: { planType: "yearly", planName: "Unlimited Generate", planPrice: 96, billingCycle: "Yearly" }
-  };
-  return planMap[planType] || planMap.monthly;
-}
-
-function formatMoney(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
-}
-
-function setSelectedPlan(planType) {
-  selectedPlan = {
-    ...planForType(planType),
-    couponCode: "",
-    discountAmount: 0,
-    finalAmount: planForType(planType).planPrice
-  };
-  sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
-}
-
-function renderPaymentPage() {
-  if (!selectedPlan) {
-    setSelectedPlan("monthly");
-  }
-
-  els.paymentPlanName.textContent = selectedPlan.planName;
-  els.paymentBillingCycle.textContent = selectedPlan.billingCycle;
-  els.paymentPlanPrice.textContent = formatMoney(selectedPlan.planPrice);
-  els.paymentFinalTotal.textContent = formatMoney(selectedPlan.finalAmount ?? selectedPlan.planPrice);
-  els.couponCode.value = selectedPlan.couponCode || "";
-}
-
-function choosePlan(planType) {
-  setSelectedPlan(planType);
-  navigateTo("/payment");
-}
-
-async function applyCoupon() {
-  if (!selectedPlan) setSelectedPlan("monthly");
-  els.paymentStatus.textContent = "Applying coupon...";
-  const code = els.couponCode.value.trim();
-
-  if (code.toUpperCase() === "FREEALL") {
-    if (!requireSignInFor("/payment")) return;
-    try {
-      const payload = await postJson("/api/apply-coupon", { code });
-      if (!payload.success) {
-        els.paymentStatus.textContent = payload.message || "Invalid coupon code.";
-        return;
-      }
-      els.paymentStatus.textContent = "Coupon applied successfully. Full access unlocked.";
-      await checkCurrentUser();
-      window.setTimeout(() => navigateTo("/dashboard"), 500);
-    } catch (error) {
-      els.paymentStatus.textContent = error.message;
-    }
-    return;
-  }
-
-  try {
-    const payload = await postJson("/api/subscription/validate-coupon", {
-      planType: selectedPlan.planType,
-      couponCode: code
-    });
-    selectedPlan = payload;
-    sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
-    renderPaymentPage();
-    els.paymentStatus.textContent = selectedPlan.couponCode ? "Coupon applied." : "No coupon applied.";
-  } catch (error) {
-    els.paymentStatus.textContent = error.message || "Invalid coupon code.";
-  }
-}
-
-async function continueToPayment() {
-  if (!requireSignInFor("/payment")) return;
-  if (!selectedPlan) setSelectedPlan("monthly");
-  els.paymentStatus.textContent = "Preparing payment...";
-
-  try {
-    const payload = await postJson("/api/subscription/create-checkout", {
-      planType: selectedPlan.planType,
-      couponCode: els.couponCode.value
-    });
-    selectedPlan = payload.total || selectedPlan;
-    sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
-    renderPaymentPage();
-    els.paymentStatus.textContent = payload.message || "Stripe integration pending.";
-  } catch (error) {
-    els.paymentStatus.textContent = error.message;
-  }
-}
-
 els.buildPacket.addEventListener("click", () => {
-  if (!requireActiveAccessFor("/builder")) return;
   const data = buildPacket();
   showReviewPage(data);
 });
 els.printPacket.addEventListener("click", downloadPacketPdf);
-els.editPacket.addEventListener("click", openProtectedBuilder);
+els.editPacket.addEventListener("click", openBuilder);
 els.homeLink.addEventListener("click", (event) => {
   event.preventDefault();
   showLandingPage();
@@ -1289,25 +1027,9 @@ els.subscriptionLink.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("/pricing");
 });
-els.dashboardLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateTo("/dashboard");
-});
-els.paymentLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateTo("/payment");
-});
-els.adminLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateTo("/admin");
-});
 els.signInLink.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("/signin");
-});
-els.createAccountLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  navigateTo("/create-account");
 });
 els.viewSubscription.addEventListener("click", (event) => {
   event.preventDefault();
@@ -1315,18 +1037,11 @@ els.viewSubscription.addEventListener("click", (event) => {
 });
 els.startBuilder.addEventListener("click", () => {
   window.history.pushState(null, "", "/builder");
-  openProtectedBuilder();
+  openBuilder();
 });
-els.chooseMonthly.addEventListener("click", () => choosePlan("monthly"));
-els.chooseYearly.addEventListener("click", () => choosePlan("yearly"));
-els.applyCoupon.addEventListener("click", applyCoupon);
-els.continuePayment.addEventListener("click", continueToPayment);
 els.signInForm.addEventListener("submit", handleSignIn);
 els.createAccountForm.addEventListener("submit", handleCreateAccount);
 els.signOutButton.addEventListener("click", signOut);
-els.navSignOutButton.addEventListener("click", signOut);
-els.dashboardBuilder.addEventListener("click", openProtectedBuilder);
-els.dashboardUpgrade.addEventListener("click", () => navigateTo("/payment"));
 els.forgotPasswordLink.addEventListener("click", (event) => {
   event.preventDefault();
   els.resetEmail.value = els.signInEmail.value;

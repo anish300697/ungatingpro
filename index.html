@@ -11,14 +11,10 @@
       <nav class="site-nav" aria-label="Primary navigation">
         <a class="site-brand" id="homeLink" href="#home" aria-label="A2Z UNGATING home">A2Z UNGATING</a>
         <div class="site-links">
-          <a id="convertLink" href="/convert">Convert</a>
-          <a id="subscriptionLink" href="/pricing">Pricing</a>
-          <a id="dashboardLink" class="auth-only is-hidden" href="/dashboard">Dashboard</a>
-          <a id="paymentLink" class="auth-only is-hidden" href="/payment">Payment</a>
-          <a id="adminLink" class="admin-only is-hidden" href="/admin">Admin</a>
+          <a id="ungateBuilderLink" href="#builder">Ungate Builder</a>
+          <a id="convertLink" href="#convert">Convert</a>
+          <a id="subscriptionLink" href="#subscription">Subscription</a>
           <a id="signInLink" href="/signin">Sign In</a>
-          <a id="createAccountLink" href="/create-account">Create Account</a>
-          <button id="navSignOutButton" class="nav-sign-out auth-only is-hidden" type="button">Sign Out</button>
         </div>
       </nav>
 
@@ -181,7 +177,7 @@
               <li>Invoice, photo, and support document merging</li>
               <li>ASIN-named PDF downloads</li>
             </ul>
-            <button id="chooseMonthly" type="button" data-plan-type="monthly">Choose Monthly</button>
+            <button type="button">Choose Monthly</button>
           </article>
 
           <article class="pricing-card featured">
@@ -201,73 +197,7 @@
               <li>Ideal for ongoing replenishment and new ASIN approval work</li>
               <li>Cleaner yearly billing</li>
             </ul>
-            <button id="chooseYearly" type="button" data-plan-type="yearly">Choose Yearly</button>
-          </article>
-        </section>
-      </section>
-
-      <section id="paymentPage" class="page payment-page is-hidden" aria-label="Subscription payment">
-        <header class="auth-hero">
-          <div>
-            <p class="eyebrow">Subscription Checkout</p>
-            <h1>Payment</h1>
-            <p>Review your selected plan, apply a coupon, and continue to payment.</p>
-          </div>
-        </header>
-
-        <section class="payment-panel">
-          <div class="payment-summary">
-            <div>
-              <span>Selected Plan</span>
-              <strong id="paymentPlanName">Unlimited Generate</strong>
-            </div>
-            <div>
-              <span>Billing Cycle</span>
-              <strong id="paymentBillingCycle">Monthly</strong>
-            </div>
-            <div>
-              <span>Price</span>
-              <strong id="paymentPlanPrice">$9.99</strong>
-            </div>
-          </div>
-
-          <div class="coupon-row">
-            <label>
-              Coupon code
-              <input id="couponCode" placeholder="LAUNCH10" />
-            </label>
-            <button id="applyCoupon" type="button">Apply Coupon</button>
-          </div>
-
-          <div class="payment-total">
-            <span>Final Total</span>
-            <strong id="paymentFinalTotal">$9.99</strong>
-          </div>
-
-          <p id="paymentStatus" class="download-status" aria-live="polite"></p>
-          <button id="continuePayment" type="button">Continue to Payment</button>
-        </section>
-      </section>
-
-      <section id="dashboardPage" class="page auth-page is-hidden" aria-label="Dashboard">
-        <header class="auth-hero">
-          <div>
-            <p class="eyebrow">Seller Workspace</p>
-            <h1>Dashboard</h1>
-            <p>Manage your ungating tools and access status.</p>
-          </div>
-        </header>
-
-        <section class="dashboard-grid">
-          <article class="dashboard-card">
-            <h2>Ungate Builder</h2>
-            <p>Create a master ungating packet from SOP details, invoices, delivery slips, and product photos.</p>
-            <button id="dashboardBuilder" type="button">Open Builder</button>
-          </article>
-          <article class="dashboard-card">
-            <h2>Access Status</h2>
-            <p id="dashboardAccessStatus">Checking access...</p>
-            <button id="dashboardUpgrade" type="button" class="secondary">Payment / Upgrade</button>
+            <button type="button">Choose Yearly</button>
           </article>
         </section>
       </section>

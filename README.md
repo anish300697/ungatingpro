@@ -14,8 +14,6 @@ A2Z UNGATING is a hosted ungating packet builder and document converter for sell
 - Generates master PDFs through `POST /api/generate-master-pdf`.
 - Converts `.docx` files into a merged PDF using the Node backend.
 - Converts JPG, PNG, HEIC, and HEIF photos into a merged PDF using the Node backend.
-- Protects builder, converter, upload, and PDF generation tools behind sign-in plus active subscription/trial access.
-- Includes a subscription checkout placeholder with coupon validation while Stripe integration is pending.
 
 ## Hostinger Deployment
 
@@ -62,22 +60,6 @@ NODE_ENV=production
 ```
 
 The master account is created privately by the server and is not displayed on the public website. Password reset links are emailed through the SMTP settings above, use `/reset-password?token=...`, and expire after 30 minutes.
-
-## Subscription And Coupons
-
-Available plans:
-
-- Monthly: `Unlimited Generate`, `$9.99`
-- Yearly: `Unlimited Generate`, `$96`
-
-Initial coupon codes:
-
-- `LAUNCH10`: 10% off
-- `BETA25`: 25% off
-- `YEARLY50`: $50 off yearly plan only
-- `FREEALL`: grants full access for the signed-in user without Stripe and records the payment status as `coupon`
-
-Stripe checkout is not active yet. The payment page records pending payment attempts in the database and shows a safe `Stripe integration pending` message until Stripe keys and checkout creation are added.
 
 ## Local Development
 
