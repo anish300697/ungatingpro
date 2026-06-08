@@ -1,13 +1,20 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import mammoth from "mammoth";
 import heicConvert from "heic-convert";
+import mysql from "mysql2/promise";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
+const sessionCookieName = "a2z_session";
+const sessionDays = 14;
+
+let dbPool = null;
+let dbReady = false;
 
 const pageSize = {
   width: 612,
@@ -42,6 +49,15 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function sendJsonWithHeaders(response, status, payload, headers = {}) {
+  response.writeHead(status, {
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": "application/json; charset=utf-8",
+    ...headers
+  });
+  response.end(JSON.stringify(payload));
+}
+
 function readRequestBody(request) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -49,6 +65,306 @@ function readRequestBody(request) {
     request.on("end", () => resolve(Buffer.concat(chunks)));
     request.on("error", reject);
   });
+}
+
+async function readJsonBody(request) {
+  const body = await readRequestBody(request);
+  if (!body.length) return {};
+  return JSON.parse(body.toString("utf8"));
+}
+
+function hasDatabaseConfig() {
+  return Boolean(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME);
+}
+
+function requireDatabase(response) {
+  if (dbReady && dbPool) return true;
+  sendJson(response, 503, {
+    error: "Database is not configured. Add DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, and DB_PORT in Hostinger environment variables."
+  });
+  return false;
+}
+
+async function initDatabase() {
+  if (!hasDatabaseConfig()) {
+    console.warn("A2Z auth database is not configured. Sign In will stay unavailable until DB env vars are added.");
+    return;
+  }
+
+  dbPool = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD || "",
+    database: process.env.DB_NAME,
+    port: Number(process.env.DB_PORT || 3306),
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
+    namedPlaceholders: true
+  });
+
+  await dbPool.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(160) NOT NULL,
+      email VARCHAR(191) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(32) NOT NULL DEFAULT 'user',
+      status VARCHAR(32) NOT NULL DEFAULT 'active',
+      is_master TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await dbPool.execute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id CHAR(64) PRIMARY KEY,
+      user_id INT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  await seedMasterAccount();
+  dbReady = true;
+}
+
+function hashPassword(password) {
+  const iterations = 210000;
+  const salt = randomBytes(16).toString("hex");
+  const hash = pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [scheme, iterations, salt, hash] = String(storedHash || "").split("$");
+  if (scheme !== "pbkdf2" || !iterations || !salt || !hash) return false;
+  const candidate = pbkdf2Sync(password, salt, Number(iterations), 32, "sha256");
+  const expected = Buffer.from(hash, "hex");
+  return expected.length === candidate.length && timingSafeEqual(expected, candidate);
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    isMaster: Boolean(user.is_master)
+  };
+}
+
+async function seedMasterAccount() {
+  const email = normalizeEmail(process.env.MASTER_ADMIN_EMAIL);
+  const password = process.env.MASTER_ADMIN_PASSWORD;
+  const name = process.env.MASTER_ADMIN_NAME || "Master Admin";
+  if (!email || !password) return;
+
+  const passwordHash = hashPassword(password);
+  await dbPool.execute(
+    `
+      INSERT INTO users (name, email, password_hash, role, status, is_master)
+      VALUES (:name, :email, :passwordHash, 'admin', 'active', 1)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        password_hash = VALUES(password_hash),
+        role = 'admin',
+        status = 'active',
+        is_master = 1
+    `,
+    { name, email, passwordHash }
+  );
+}
+
+function parseCookies(request) {
+  return Object.fromEntries(
+    String(request.headers.cookie || "")
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf("=");
+        return index === -1 ? [part, ""] : [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+      })
+  );
+}
+
+function getCookieHeader(request, token) {
+  const secure = request.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+  const maxAge = sessionDays * 24 * 60 * 60;
+  return `${sessionCookieName}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+}
+
+function getClearCookieHeader(request) {
+  const secure = request.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+  return `${sessionCookieName}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+async function createSession(userId) {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000);
+  await dbPool.execute("INSERT INTO sessions (id, user_id, expires_at) VALUES (:token, :userId, :expiresAt)", {
+    token,
+    userId,
+    expiresAt
+  });
+  return token;
+}
+
+async function getSessionUser(request) {
+  if (!dbReady || !dbPool) return null;
+  const token = parseCookies(request)[sessionCookieName];
+  if (!token) return null;
+
+  const [rows] = await dbPool.execute(
+    `
+      SELECT users.*
+      FROM sessions
+      JOIN users ON users.id = sessions.user_id
+      WHERE sessions.id = :token
+        AND sessions.expires_at > NOW()
+        AND users.status = 'active'
+      LIMIT 1
+    `,
+    { token }
+  );
+  return rows[0] || null;
+}
+
+async function requireAdmin(request, response) {
+  const user = await getSessionUser(request);
+  if (!user) {
+    sendJson(response, 401, { error: "Sign in is required." });
+    return null;
+  }
+  if (user.role !== "admin" && !user.is_master) {
+    sendJson(response, 403, { error: "Master admin access is required." });
+    return null;
+  }
+  return user;
+}
+
+async function handleCreateAccount(request, response) {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const name = String(payload.name || "").trim();
+    const email = normalizeEmail(payload.email);
+    const password = String(payload.password || "");
+
+    if (!name || !email || !password) {
+      sendJson(response, 400, { error: "Name, email, and password are required." });
+      return;
+    }
+
+    if (password.length < 8) {
+      sendJson(response, 400, { error: "Password must be at least 8 characters." });
+      return;
+    }
+
+    const passwordHash = hashPassword(password);
+    const [result] = await dbPool.execute(
+      "INSERT INTO users (name, email, password_hash) VALUES (:name, :email, :passwordHash)",
+      { name, email, passwordHash }
+    );
+    const token = await createSession(result.insertId);
+    const [rows] = await dbPool.execute("SELECT * FROM users WHERE id = :id LIMIT 1", { id: result.insertId });
+
+    sendJsonWithHeaders(response, 201, { user: publicUser(rows[0]) }, { "Set-Cookie": getCookieHeader(request, token) });
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      sendJson(response, 409, { error: "An account already exists with this email." });
+      return;
+    }
+    sendJson(response, 500, { error: `Could not create account: ${error.message}` });
+  }
+}
+
+async function handleSignIn(request, response) {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const email = normalizeEmail(payload.email);
+    const password = String(payload.password || "");
+    const [rows] = await dbPool.execute("SELECT * FROM users WHERE email = :email LIMIT 1", { email });
+    const user = rows[0];
+
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      sendJson(response, 401, { error: "Invalid email or password." });
+      return;
+    }
+
+    if (user.status !== "active") {
+      sendJson(response, 403, { error: "This account is disabled. Contact support." });
+      return;
+    }
+
+    const token = await createSession(user.id);
+    sendJsonWithHeaders(response, 200, { user: publicUser(user) }, { "Set-Cookie": getCookieHeader(request, token) });
+  } catch (error) {
+    sendJson(response, 500, { error: `Could not sign in: ${error.message}` });
+  }
+}
+
+async function handleSignOut(request, response) {
+  if (dbPool) {
+    const token = parseCookies(request)[sessionCookieName];
+    if (token) await dbPool.execute("DELETE FROM sessions WHERE id = :token", { token });
+  }
+  sendJsonWithHeaders(response, 200, { ok: true }, { "Set-Cookie": getClearCookieHeader(request) });
+}
+
+async function handleCurrentUser(request, response) {
+  if (!requireDatabase(response)) return;
+  const user = await getSessionUser(request);
+  sendJson(response, user ? 200 : 401, user ? { user: publicUser(user) } : { error: "Not signed in." });
+}
+
+async function handleAdminUsers(request, response) {
+  if (!requireDatabase(response)) return;
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+
+  const [rows] = await dbPool.execute(
+    `
+      SELECT id, name, email, role, status, is_master, created_at
+      FROM users
+      WHERE is_master = 0
+      ORDER BY created_at DESC
+    `
+  );
+  sendJson(response, 200, { users: rows.map(publicUser) });
+}
+
+async function handleAdminUserUpdate(request, response) {
+  if (!requireDatabase(response)) return;
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const userId = Number(payload.userId);
+    const status = payload.status === "disabled" ? "disabled" : "active";
+
+    if (!userId) {
+      sendJson(response, 400, { error: "User ID is required." });
+      return;
+    }
+
+    await dbPool.execute("UPDATE users SET status = :status WHERE id = :userId AND is_master = 0", { status, userId });
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 500, { error: `Could not update user: ${error.message}` });
+  }
 }
 
 function parseMultipart(buffer, contentType) {
@@ -492,7 +808,7 @@ function getSafeStaticPath(pathname) {
   return filePath === root || filePath.startsWith(rootWithSeparator) ? filePath : null;
 }
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || `${host}:${port}`}`);
 
   if (request.method === "OPTIONS") {
@@ -520,6 +836,36 @@ createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/auth/create-account") {
+    await handleCreateAccount(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/auth/sign-in") {
+    await handleSignIn(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/auth/sign-out") {
+    await handleSignOut(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/auth/me") {
+    await handleCurrentUser(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/admin/users") {
+    await handleAdminUsers(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/admin/users/update") {
+    await handleAdminUserUpdate(request, response);
+    return;
+  }
+
   const filePath = getSafeStaticPath(url.pathname);
   if (!filePath) {
     response.writeHead(403);
@@ -538,6 +884,14 @@ createServer(async (request, response) => {
     response.writeHead(404);
     response.end("Not found");
   }
-}).listen(port, host, () => {
+});
+
+try {
+  await initDatabase();
+} catch (error) {
+  console.error(`A2Z auth database failed to initialize: ${error.message}`);
+}
+
+server.listen(port, host, () => {
   console.log(`A2Z UNGATING running on port ${port}`);
 });

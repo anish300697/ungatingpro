@@ -36,6 +36,24 @@ npm install
 
 The server uses `process.env.PORT`, which Hostinger provides automatically. No Windows paths, local Python runtime, PowerShell script, or local PC dependency is required.
 
+## Database And Master Account
+
+Create a MySQL database in Hostinger, then add these environment variables to the Node.js app:
+
+```text
+DB_HOST=your_mysql_host
+DB_USER=your_mysql_user
+DB_PASSWORD=your_mysql_password
+DB_NAME=your_mysql_database
+DB_PORT=3306
+MASTER_ADMIN_EMAIL=your_private_admin_email
+MASTER_ADMIN_PASSWORD=your_private_admin_password
+MASTER_ADMIN_NAME=Master Admin
+NODE_ENV=production
+```
+
+The master account is created privately by the server and is not displayed on the public website. After signing in with that account, the private admin panel can manage public user accounts.
+
 ## Local Development
 
 If Node.js is installed locally:

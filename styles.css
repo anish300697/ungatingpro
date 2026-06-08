@@ -245,6 +245,17 @@ button.secondary {
   line-height: 1.5;
 }
 
+.home-disclaimer {
+  width: min(1240px, 100%);
+  margin: 8px auto 0;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .subscription-page {
   gap: 22px;
 }
@@ -521,6 +532,138 @@ button.secondary {
   height: 10px;
   border-radius: 999px;
   background: var(--success);
+}
+
+.auth-page {
+  gap: 22px;
+}
+
+.auth-hero,
+.account-panel {
+  width: min(1240px, 100%);
+  margin: 0 auto;
+}
+
+.auth-hero {
+  padding: 30px;
+  border: 1px solid rgba(191, 212, 228, 0.9);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(232, 241, 246, 0.78)),
+    repeating-linear-gradient(45deg, transparent, transparent 18px, rgba(15, 76, 129, 0.035) 18px, rgba(15, 76, 129, 0.035) 36px);
+  box-shadow: 0 20px 48px rgba(15, 76, 129, 0.11);
+}
+
+.auth-hero h1 {
+  color: var(--accent);
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+}
+
+.auth-hero p:not(.eyebrow) {
+  max-width: 620px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.55;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+}
+
+.auth-card,
+.account-panel,
+.admin-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 42px rgba(36, 55, 47, 0.08);
+}
+
+.auth-card {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  padding: 24px;
+}
+
+.auth-card h2,
+.account-summary h2,
+.admin-heading h2 {
+  color: var(--accent);
+  font-size: 1.35rem;
+}
+
+.account-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.account-summary,
+.admin-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.account-summary p:not(.eyebrow) {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.admin-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  box-shadow: none;
+}
+
+.admin-users {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-user-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent-3);
+  border-radius: 6px;
+  background: #fbfdfb;
+}
+
+.admin-user-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.user-status {
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--accent-2);
+  background: var(--warm-soft);
+  text-transform: capitalize;
+}
+
+.user-status.is-active-user {
+  color: var(--success);
+  background: #e6f4f0;
+}
+
+.admin-user-row button {
+  min-height: 36px;
+  box-shadow: none;
 }
 
 .entry-hero {
@@ -1136,6 +1279,7 @@ textarea {
   .two-col,
   .landing-hero,
   .business-panels,
+  .auth-grid,
   .convert-hero,
   .converter-grid,
   .subscription-hero,
@@ -1150,6 +1294,13 @@ textarea {
 
   .document-order-heading {
     display: grid;
+  }
+
+  .account-summary,
+  .admin-heading,
+  .admin-user-row {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .seller-visual {

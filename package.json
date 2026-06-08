@@ -10,6 +10,7 @@
   "dependencies": {
     "heic-convert": "^2.1.0",
     "mammoth": "^1.8.0",
+    "mysql2": "latest",
     "pdf-lib": "latest"
   },
   "engines": {

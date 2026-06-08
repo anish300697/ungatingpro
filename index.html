@@ -14,7 +14,7 @@
           <a id="ungateBuilderLink" href="#builder">Ungate Builder</a>
           <a id="convertLink" href="#convert">Convert</a>
           <a id="subscriptionLink" href="#subscription">Subscription</a>
-          <a href="#account">Sign In</a>
+          <a id="signInLink" href="#account">Sign In</a>
         </div>
       </nav>
 
@@ -78,6 +78,10 @@
             <p>Verify the generated master packet before saving the final ASIN-named PDF.</p>
           </article>
         </section>
+
+        <footer class="home-disclaimer">
+          UngatingPro helps sellers prepare and organize documentation for Amazon ungating applications. Amazon Seller Support is the sole authority responsible for reviewing and approving applications. We do not guarantee approval, approval timelines, or specific outcomes. Results may vary based on the information provided and Amazon's review policies.
+        </footer>
       </section>
 
       <section id="convertPage" class="page convert-page is-hidden" aria-label="Document converters">
@@ -195,6 +199,73 @@
             </ul>
             <button type="button">Choose Yearly</button>
           </article>
+        </section>
+      </section>
+
+      <section id="signInPage" class="page auth-page is-hidden" aria-label="Sign in or create account">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Account Access</p>
+            <h1>Sign In</h1>
+            <p>Access your seller workspace, save account details, and manage A2Z UNGATING access.</p>
+          </div>
+        </header>
+
+        <section class="auth-grid">
+          <form id="signInForm" class="auth-card">
+            <h2>Existing Account</h2>
+            <label>
+              Email
+              <input id="signInEmail" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="signInPassword" type="password" autocomplete="current-password" required />
+            </label>
+            <button type="submit">Sign In</button>
+            <p id="signInStatus" class="download-status" aria-live="polite"></p>
+          </form>
+
+          <form id="createAccountForm" class="auth-card">
+            <h2>Create Account</h2>
+            <label>
+              Full name
+              <input id="createName" autocomplete="name" required />
+            </label>
+            <label>
+              Email
+              <input id="createEmail" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="createPassword" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+            <button type="submit">Create Account</button>
+            <p id="createAccountStatus" class="download-status" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section id="accountPanel" class="account-panel is-hidden">
+          <div class="account-summary">
+            <div>
+              <p class="eyebrow">Signed In</p>
+              <h2 id="accountName">Account</h2>
+              <p id="accountEmail"></p>
+            </div>
+            <button id="signOutButton" type="button" class="secondary">Sign Out</button>
+          </div>
+
+          <div id="adminPanel" class="admin-panel is-hidden">
+            <div class="admin-heading">
+              <div>
+                <p class="eyebrow">Master Access</p>
+                <h2>User Management</h2>
+              </div>
+              <button id="refreshUsers" type="button" class="secondary">Refresh</button>
+            </div>
+            <div id="adminUsers" class="admin-users empty-state">No users loaded yet.</div>
+            <p id="adminStatus" class="download-status" aria-live="polite"></p>
+          </div>
         </section>
       </section>
 

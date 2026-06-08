@@ -24,6 +24,7 @@ const els = {
   landingPage: document.querySelector("#landingPage"),
   convertPage: document.querySelector("#convertPage"),
   subscriptionPage: document.querySelector("#subscriptionPage"),
+  signInPage: document.querySelector("#signInPage"),
   entryPage: document.querySelector("#entryPage"),
   reviewPage: document.querySelector("#reviewPage"),
   checklist: document.querySelector("#checklist"),
@@ -44,6 +45,7 @@ const els = {
   ungateBuilderLink: document.querySelector("#ungateBuilderLink"),
   convertLink: document.querySelector("#convertLink"),
   subscriptionLink: document.querySelector("#subscriptionLink"),
+  signInLink: document.querySelector("#signInLink"),
   viewSubscription: document.querySelector("#viewSubscription"),
   startBuilder: document.querySelector("#startBuilder"),
   wordFileList: document.querySelector("#wordFileList"),
@@ -52,11 +54,29 @@ const els = {
   convertPhotos: document.querySelector("#convertPhotos"),
   wordConvertStatus: document.querySelector("#wordConvertStatus"),
   photoConvertStatus: document.querySelector("#photoConvertStatus"),
-  downloadStatus: document.querySelector("#downloadStatus")
+  downloadStatus: document.querySelector("#downloadStatus"),
+  signInForm: document.querySelector("#signInForm"),
+  createAccountForm: document.querySelector("#createAccountForm"),
+  signInEmail: document.querySelector("#signInEmail"),
+  signInPassword: document.querySelector("#signInPassword"),
+  signInStatus: document.querySelector("#signInStatus"),
+  createName: document.querySelector("#createName"),
+  createEmail: document.querySelector("#createEmail"),
+  createPassword: document.querySelector("#createPassword"),
+  createAccountStatus: document.querySelector("#createAccountStatus"),
+  accountPanel: document.querySelector("#accountPanel"),
+  accountName: document.querySelector("#accountName"),
+  accountEmail: document.querySelector("#accountEmail"),
+  signOutButton: document.querySelector("#signOutButton"),
+  adminPanel: document.querySelector("#adminPanel"),
+  adminUsers: document.querySelector("#adminUsers"),
+  adminStatus: document.querySelector("#adminStatus"),
+  refreshUsers: document.querySelector("#refreshUsers")
 };
 
 let fileUrls = [];
 let packetDocumentOrder = [];
+let currentUser = null;
 
 const requiredEvidence = [
   {
@@ -404,6 +424,7 @@ function showReviewPage(data) {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.remove("is-hidden");
   els.mergeStatus.textContent = "";
@@ -415,6 +436,7 @@ function showEntryPage() {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.entryPage.classList.remove("is-hidden");
   setActiveNav(els.ungateBuilderLink);
@@ -426,6 +448,7 @@ function showLandingPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
   els.landingPage.classList.remove("is-hidden");
   setActiveNav(null);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -436,6 +459,7 @@ function showConvertPage() {
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
   els.convertPage.classList.remove("is-hidden");
   setActiveNav(els.convertLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -446,13 +470,25 @@ function showSubscriptionPage() {
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
   els.subscriptionPage.classList.remove("is-hidden");
   setActiveNav(els.subscriptionLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function showSignInPage() {
+  els.landingPage.classList.add("is-hidden");
+  els.entryPage.classList.add("is-hidden");
+  els.reviewPage.classList.add("is-hidden");
+  els.convertPage.classList.add("is-hidden");
+  els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.remove("is-hidden");
+  setActiveNav(els.signInLink);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function setActiveNav(activeLink) {
-  [els.ungateBuilderLink, els.convertLink, els.subscriptionLink].forEach((link) => link?.classList.remove("is-active"));
+  [els.ungateBuilderLink, els.convertLink, els.subscriptionLink, els.signInLink].forEach((link) => link?.classList.remove("is-active"));
   activeLink?.classList.add("is-active");
 }
 
@@ -720,6 +756,158 @@ async function downloadPacketPdf() {
   }
 }
 
+async function postJson(url, payload = {}) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return parseJsonResponse(response);
+}
+
+async function parseJsonResponse(response) {
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Request failed.");
+  }
+
+  return payload;
+}
+
+function renderAccount(user) {
+  currentUser = user;
+  if (!user) {
+    els.accountPanel.classList.add("is-hidden");
+    els.adminPanel.classList.add("is-hidden");
+    els.signInLink.textContent = "Sign In";
+    return;
+  }
+
+  els.accountPanel.classList.remove("is-hidden");
+  els.accountName.textContent = user.name || "Account";
+  els.accountEmail.textContent = user.email || "";
+  els.signInLink.textContent = user.isMaster || user.role === "admin" ? "Admin" : "Account";
+
+  if (user.isMaster || user.role === "admin") {
+    els.adminPanel.classList.remove("is-hidden");
+    loadAdminUsers();
+  } else {
+    els.adminPanel.classList.add("is-hidden");
+  }
+}
+
+async function checkCurrentUser() {
+  try {
+    const payload = await parseJsonResponse(await fetch("/api/auth/me"));
+    renderAccount(payload.user);
+  } catch {
+    renderAccount(null);
+  }
+}
+
+async function handleSignIn(event) {
+  event.preventDefault();
+  els.signInStatus.textContent = "Signing in...";
+
+  try {
+    const payload = await postJson("/api/auth/sign-in", {
+      email: els.signInEmail.value,
+      password: els.signInPassword.value
+    });
+    els.signInForm.reset();
+    els.signInStatus.textContent = "Signed in.";
+    renderAccount(payload.user);
+  } catch (error) {
+    els.signInStatus.textContent = error.message;
+  }
+}
+
+async function handleCreateAccount(event) {
+  event.preventDefault();
+  els.createAccountStatus.textContent = "Creating account...";
+
+  try {
+    const payload = await postJson("/api/auth/create-account", {
+      name: els.createName.value,
+      email: els.createEmail.value,
+      password: els.createPassword.value
+    });
+    els.createAccountForm.reset();
+    els.createAccountStatus.textContent = "Account created.";
+    renderAccount(payload.user);
+  } catch (error) {
+    els.createAccountStatus.textContent = error.message;
+  }
+}
+
+async function signOut() {
+  try {
+    await postJson("/api/auth/sign-out");
+  } finally {
+    renderAccount(null);
+    els.signInStatus.textContent = "Signed out.";
+    showSignInPage();
+  }
+}
+
+function renderAdminUsers(users) {
+  if (!users.length) {
+    els.adminUsers.className = "admin-users empty-state";
+    els.adminUsers.textContent = "No public users yet.";
+    return;
+  }
+
+  els.adminUsers.className = "admin-users";
+  els.adminUsers.innerHTML = users
+    .map(
+      (user) => `
+        <div class="admin-user-row">
+          <div>
+            <strong>${escapeHtml(user.name)}</strong>
+            <span>${escapeHtml(user.email)}</span>
+          </div>
+          <span class="user-status ${user.status === "active" ? "is-active-user" : ""}">${escapeHtml(user.status)}</span>
+          <button type="button" data-user-id="${user.id}" data-status="${user.status === "active" ? "disabled" : "active"}">
+            ${user.status === "active" ? "Disable" : "Enable"}
+          </button>
+        </div>`
+    )
+    .join("");
+}
+
+async function loadAdminUsers() {
+  if (!currentUser || (currentUser.role !== "admin" && !currentUser.isMaster)) return;
+  els.adminStatus.textContent = "Loading users...";
+
+  try {
+    const payload = await parseJsonResponse(await fetch("/api/admin/users"));
+    renderAdminUsers(payload.users || []);
+    els.adminStatus.textContent = "";
+  } catch (error) {
+    els.adminStatus.textContent = error.message;
+  }
+}
+
+async function updateAdminUser(button) {
+  els.adminStatus.textContent = "Updating user...";
+  try {
+    await postJson("/api/admin/users/update", {
+      userId: button.dataset.userId,
+      status: button.dataset.status
+    });
+    await loadAdminUsers();
+    els.adminStatus.textContent = "User updated.";
+  } catch (error) {
+    els.adminStatus.textContent = error.message;
+  }
+}
+
 els.buildPacket.addEventListener("click", () => {
   const data = buildPacket();
   showReviewPage(data);
@@ -742,11 +930,19 @@ els.subscriptionLink.addEventListener("click", (event) => {
   event.preventDefault();
   showSubscriptionPage();
 });
+els.signInLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  showSignInPage();
+});
 els.viewSubscription.addEventListener("click", (event) => {
   event.preventDefault();
   showSubscriptionPage();
 });
 els.startBuilder.addEventListener("click", showEntryPage);
+els.signInForm.addEventListener("submit", handleSignIn);
+els.createAccountForm.addEventListener("submit", handleCreateAccount);
+els.signOutButton.addEventListener("click", signOut);
+els.refreshUsers.addEventListener("click", loadAdminUsers);
 els.convertWord.addEventListener("click", convertWordToPdf);
 els.convertPhotos.addEventListener("click", convertPhotosToPdf);
 fields.wordFiles.addEventListener("change", updateConverterLists);
@@ -755,6 +951,11 @@ els.documentOrderList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   movePacketDocument(Number(button.dataset.index), button.dataset.action);
+});
+els.adminUsers.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-user-id]");
+  if (!button) return;
+  updateAdminUser(button);
 });
 
 Object.values(fields).forEach((field) => {
@@ -765,3 +966,4 @@ Object.values(fields).forEach((field) => {
 buildPacket();
 updateConverterLists();
 setupDragAndDrop();
+checkCurrentUser();
