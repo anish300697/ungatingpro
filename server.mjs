@@ -190,7 +190,7 @@ async function handleWordConversion(request, response) {
 
     pdfDoc.setTitle("WORD_TO_PDF");
     pdfDoc.setSubject("Word documents converted to PDF");
-    pdfDoc.setCreator("Project X Convert");
+    pdfDoc.setCreator("A2Z UNGATING Convert");
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
@@ -266,7 +266,7 @@ async function handlePhotoConversion(request, response) {
 
     pdfDoc.setTitle("PHOTOS_TO_PDF");
     pdfDoc.setSubject("Photos converted to PDF");
-    pdfDoc.setCreator("Project X Convert");
+    pdfDoc.setCreator("A2Z UNGATING Convert");
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
@@ -330,5 +330,5 @@ createServer(async (request, response) => {
     response.end("Not found");
   }
 }).listen(port, host, () => {
-  console.log(`Project X running on port ${port}`);
+  console.log(`A2Z UNGATING running on port ${port}`);
 });

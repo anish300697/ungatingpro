@@ -1,7 +1,7 @@
 {
   "name": "project-x",
   "version": "1.0.0",
-  "description": "Project X ungating packet builder and document converter.",
+  "description": "A2Z UNGATING packet builder and document converter.",
   "type": "module",
   "scripts": {
     "start": "node server.mjs",

@@ -1,6 +1,6 @@
-# Project X
+# A2Z UNGATING
 
-Project X is a hosted ungating packet builder and document converter for seller approval workflows.
+A2Z UNGATING is a hosted ungating packet builder and document converter for seller approval workflows.
 
 ## What It Does
 

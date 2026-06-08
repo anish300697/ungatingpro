@@ -597,7 +597,7 @@ async function buildPhotosPdfBytes(files) {
   }
   pdfDoc.setTitle(getConverterFileName(files, "PHOTOS_TO_PDF"));
   pdfDoc.setSubject("Photos merged into PDF");
-  pdfDoc.setCreator("Project X Convert");
+  pdfDoc.setCreator("A2Z UNGATING Convert");
   return pdfDoc.save();
 }
 
@@ -617,7 +617,7 @@ async function buildPhotosPdfBytesWithBackend(files) {
       body: formData
     });
   } catch {
-    throw new Error("Open Project X from the hosted website or start the Node server, then try again.");
+    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
   }
 
   if (!response.ok) {
@@ -651,13 +651,13 @@ async function buildWordPdfBytes(files) {
   for (const file of files) {
     await pdfDoc.attach(await file.arrayBuffer(), file.name, {
       mimeType: file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      description: "Original Word document selected in Project X Convert"
+      description: "Original Word document selected in A2Z UNGATING Convert"
     });
   }
 
   pdfDoc.setTitle(getConverterFileName(files, "WORD_TO_PDF"));
   pdfDoc.setSubject("Word documents packaged into PDF");
-  pdfDoc.setCreator("Project X Convert");
+  pdfDoc.setCreator("A2Z UNGATING Convert");
   return pdfDoc.save();
 }
 
@@ -673,7 +673,7 @@ async function buildWordPdfBytesWithBackend(files) {
       body: formData
     });
   } catch {
-    throw new Error("Open Project X from the hosted website or start the Node server, then try again.");
+    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
   }
 
 
