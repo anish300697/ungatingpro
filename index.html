@@ -12,7 +12,7 @@
         <a class="site-brand" id="homeLink" href="#home" aria-label="A2Z UNGATING home">A2Z UNGATING</a>
         <div class="site-links">
           <a id="ungateBuilderLink" href="#builder">Ungate Builder</a>
-          <a id="convertLink" href="#convert">Convert</a>
+          <a id="convertLink" href="#convert">Free Convert</a>
           <a id="subscriptionLink" href="#subscription">Subscription</a>
           <a id="signInLink" href="/signin">Sign In</a>
         </div>
@@ -177,7 +177,7 @@
               <li>Invoice, photo, and support document merging</li>
               <li>ASIN-named PDF downloads</li>
             </ul>
-            <button type="button">Choose Monthly</button>
+            <button id="chooseMonthly" type="button" data-plan-type="monthly">Choose Monthly</button>
           </article>
 
           <article class="pricing-card featured">
@@ -197,8 +197,36 @@
               <li>Ideal for ongoing replenishment and new ASIN approval work</li>
               <li>Cleaner yearly billing</li>
             </ul>
-            <button type="button">Choose Yearly</button>
+            <button id="chooseYearly" type="button" data-plan-type="yearly">Choose Yearly</button>
           </article>
+        </section>
+        <p id="subscriptionStatus" class="download-status centered-status" aria-live="polite"></p>
+      </section>
+
+      <section id="couponPage" class="page subscription-page is-hidden" aria-label="Coupon code">
+        <header class="subscription-hero compact-hero">
+          <div>
+            <p class="eyebrow">Subscription Access</p>
+            <h1>Enter Coupon Code</h1>
+            <p>Apply an approved coupon before continuing to the payment step.</p>
+          </div>
+        </header>
+
+        <section class="coupon-panel">
+          <div class="coupon-summary">
+            <p class="eyebrow">Selected Plan</p>
+            <h2 id="selectedPlanName">Unlimited Generate</h2>
+            <p id="selectedBillingType">Billing type: Monthly</p>
+          </div>
+          <label>
+            Coupon code
+            <input id="couponCode" type="text" autocomplete="off" placeholder="Enter coupon code" />
+          </label>
+          <div class="coupon-actions">
+            <button id="applyCoupon" type="button">Apply Coupon</button>
+            <button id="continuePayment" type="button" class="secondary" disabled>Continue</button>
+          </div>
+          <p id="couponStatus" class="download-status" aria-live="polite"></p>
         </section>
       </section>
 

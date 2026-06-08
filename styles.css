@@ -47,6 +47,12 @@ button {
   box-shadow: 0 10px 18px rgba(15, 76, 129, 0.18);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
 button.secondary {
   border: 1px solid var(--line);
   color: var(--ink);
@@ -456,6 +462,59 @@ button.link-button {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.compact-hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.coupon-panel {
+  display: grid;
+  gap: 18px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 42px rgba(36, 55, 47, 0.08);
+}
+
+.coupon-summary {
+  padding: 18px;
+  border: 1px solid rgba(191, 212, 228, 0.82);
+  border-radius: 8px;
+  background: #f7fbfa;
+}
+
+.coupon-summary h2 {
+  margin: 6px 0;
+  color: var(--accent);
+  font-size: 1.45rem;
+}
+
+.coupon-summary p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.coupon-panel label {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.coupon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.centered-status {
+  width: min(1240px, 100%);
+  margin: 0 auto;
 }
 
 .pricing-grid {

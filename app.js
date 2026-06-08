@@ -24,6 +24,7 @@ const els = {
   landingPage: document.querySelector("#landingPage"),
   convertPage: document.querySelector("#convertPage"),
   subscriptionPage: document.querySelector("#subscriptionPage"),
+  couponPage: document.querySelector("#couponPage"),
   signInPage: document.querySelector("#signInPage"),
   forgotPasswordPage: document.querySelector("#forgotPasswordPage"),
   resetPasswordPage: document.querySelector("#resetPasswordPage"),
@@ -50,6 +51,15 @@ const els = {
   signInLink: document.querySelector("#signInLink"),
   viewSubscription: document.querySelector("#viewSubscription"),
   startBuilder: document.querySelector("#startBuilder"),
+  chooseMonthly: document.querySelector("#chooseMonthly"),
+  chooseYearly: document.querySelector("#chooseYearly"),
+  subscriptionStatus: document.querySelector("#subscriptionStatus"),
+  selectedPlanName: document.querySelector("#selectedPlanName"),
+  selectedBillingType: document.querySelector("#selectedBillingType"),
+  couponCode: document.querySelector("#couponCode"),
+  applyCoupon: document.querySelector("#applyCoupon"),
+  continuePayment: document.querySelector("#continuePayment"),
+  couponStatus: document.querySelector("#couponStatus"),
   wordFileList: document.querySelector("#wordFileList"),
   photoFileList: document.querySelector("#photoFileList"),
   convertWord: document.querySelector("#convertWord"),
@@ -84,6 +94,15 @@ let fileUrls = [];
 let packetDocumentOrder = [];
 let currentUser = null;
 let resetToken = "";
+let selectedPlan = JSON.parse(sessionStorage.getItem("selectedPlan") || "null");
+let builderRequestedAfterLogin = sessionStorage.getItem("builderRequestedAfterLogin") === "true";
+let couponRequestedAfterLogin = sessionStorage.getItem("couponRequestedAfterLogin") === "true";
+let couponApplied = false;
+
+const planDetails = {
+  monthly: { planType: "monthly", planName: "Unlimited Generate", billingType: "Monthly", price: 9.99 },
+  yearly: { planType: "yearly", planName: "Unlimited Generate", billingType: "Yearly", price: 96 }
+};
 
 const requiredEvidence = [
   {
@@ -431,6 +450,7 @@ function showReviewPage(data) {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -445,6 +465,7 @@ function showEntryPage() {
   els.landingPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -459,6 +480,7 @@ function showLandingPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -472,6 +494,7 @@ function showConvertPage() {
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
@@ -480,15 +503,35 @@ function showConvertPage() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function showSubscriptionPage() {
+function showSubscriptionPage(message = "") {
   els.landingPage.classList.add("is-hidden");
   els.entryPage.classList.add("is-hidden");
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.subscriptionPage.classList.remove("is-hidden");
+  els.subscriptionStatus.textContent = message;
+  setActiveNav(els.subscriptionLink);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showCouponPage() {
+  const plan = selectedPlan || planDetails.monthly;
+  els.landingPage.classList.add("is-hidden");
+  els.entryPage.classList.add("is-hidden");
+  els.reviewPage.classList.add("is-hidden");
+  els.convertPage.classList.add("is-hidden");
+  els.subscriptionPage.classList.add("is-hidden");
+  els.signInPage.classList.add("is-hidden");
+  els.forgotPasswordPage.classList.add("is-hidden");
+  els.resetPasswordPage.classList.add("is-hidden");
+  els.couponPage.classList.remove("is-hidden");
+  els.selectedPlanName.textContent = plan.planName;
+  els.selectedBillingType.textContent = `Billing type: ${plan.billingType}`;
+  els.continuePayment.disabled = !couponApplied;
   setActiveNav(els.subscriptionLink);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -499,6 +542,7 @@ function showSignInPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.signInPage.classList.remove("is-hidden");
@@ -512,6 +556,7 @@ function showForgotPasswordPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.remove("is-hidden");
@@ -525,6 +570,7 @@ function showResetPasswordPage() {
   els.reviewPage.classList.add("is-hidden");
   els.convertPage.classList.add("is-hidden");
   els.subscriptionPage.classList.add("is-hidden");
+  els.couponPage.classList.add("is-hidden");
   els.signInPage.classList.add("is-hidden");
   els.forgotPasswordPage.classList.add("is-hidden");
   els.resetPasswordPage.classList.remove("is-hidden");
@@ -537,7 +583,35 @@ function setActiveNav(activeLink) {
   activeLink?.classList.add("is-active");
 }
 
+function hasActiveSubscription(user = currentUser) {
+  if (!user) return false;
+  return Boolean(
+    user.hasActiveAccess ||
+      user.hasFullAccess ||
+      user.subscriptionStatus === "active" ||
+      user.plan === "free_all" ||
+      user.planType === "free_all" ||
+      user.role === "admin" ||
+      user.isMaster
+  );
+}
+
 function openBuilder() {
+  if (!currentUser) {
+    builderRequestedAfterLogin = true;
+    sessionStorage.setItem("builderRequestedAfterLogin", "true");
+    window.history.pushState(null, "", "/signin");
+    showSignInPage();
+    els.signInStatus.textContent = "Please sign in to use Ungate Builder.";
+    return;
+  }
+
+  if (!hasActiveSubscription()) {
+    window.history.pushState(null, "", "/pricing");
+    showSubscriptionPage("An active subscription is required to use Ungate Builder.");
+    return;
+  }
+
   showEntryPage();
 }
 
@@ -566,6 +640,15 @@ function handleRoute() {
 
   if (path === "/subscription" || path === "/pricing") {
     showSubscriptionPage();
+    return;
+  }
+
+  if (path === "/coupon") {
+    if (!selectedPlan) {
+      selectedPlan = planDetails.monthly;
+      sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
+    }
+    showCouponPage();
     return;
   }
 
@@ -788,6 +871,10 @@ function getResponseFileName(response, fallback) {
 }
 
 async function buildMasterPdfWithBackend(data) {
+  if (!hasActiveSubscription()) {
+    throw new Error("An active subscription is required to generate ungating packets.");
+  }
+
   syncPacketDocumentOrder(data.files, true);
 
   if (!packetDocumentOrder.length) {
@@ -872,7 +959,7 @@ async function parseJsonResponse(response) {
   }
 
   if (!response.ok) {
-    throw new Error(payload.error || "Request failed.");
+    throw new Error(payload.error || payload.message || "Request failed.");
   }
 
   return payload;
@@ -914,9 +1001,30 @@ async function handleSignIn(event) {
     els.signInForm.reset();
     els.signInStatus.textContent = "Signed in.";
     renderAccount(payload.user);
+    continueAfterAuth(payload.user);
   } catch (error) {
     els.signInStatus.textContent = "Invalid email or password.";
     els.resetEmail.value = els.signInEmail.value;
+  }
+}
+
+function continueAfterAuth(user) {
+  if (couponRequestedAfterLogin || sessionStorage.getItem("couponRequestedAfterLogin") === "true") {
+    couponRequestedAfterLogin = false;
+    sessionStorage.removeItem("couponRequestedAfterLogin");
+    navigateTo("/coupon");
+    return;
+  }
+
+  if (builderRequestedAfterLogin || sessionStorage.getItem("builderRequestedAfterLogin") === "true") {
+    builderRequestedAfterLogin = false;
+    sessionStorage.removeItem("builderRequestedAfterLogin");
+    if (hasActiveSubscription(user)) {
+      navigateTo("/builder");
+    } else {
+      navigateTo("/pricing");
+      els.subscriptionStatus.textContent = "An active subscription is required to use Ungate Builder.";
+    }
   }
 }
 
@@ -933,6 +1041,7 @@ async function handleCreateAccount(event) {
     els.createAccountForm.reset();
     els.createAccountStatus.textContent = "Account created.";
     renderAccount(payload.user);
+    continueAfterAuth(payload.user);
   } catch (error) {
     els.createAccountStatus.textContent = error.message;
   }
@@ -946,6 +1055,8 @@ async function signOut() {
     sessionStorage.clear();
     localStorage.removeItem("a2z_session");
     localStorage.removeItem("authToken");
+    selectedPlan = null;
+    couponApplied = false;
     renderAccount(null);
     clearFileUrls();
     fields.proofFiles.value = "";
@@ -958,6 +1069,54 @@ async function signOut() {
     window.history.replaceState(null, "", "/signin");
     showSignInPage();
   }
+}
+
+function selectSubscriptionPlan(planType) {
+  selectedPlan = planDetails[planType] || planDetails.monthly;
+  couponApplied = false;
+  sessionStorage.setItem("selectedPlan", JSON.stringify(selectedPlan));
+  els.couponCode.value = "";
+  els.couponStatus.textContent = "";
+  els.continuePayment.disabled = true;
+  navigateTo("/coupon");
+}
+
+async function applyCouponCode() {
+  if (!currentUser) {
+    couponRequestedAfterLogin = true;
+    sessionStorage.setItem("couponRequestedAfterLogin", "true");
+    navigateTo("/signin");
+    els.signInStatus.textContent = "Please sign in before applying a subscription coupon.";
+    return;
+  }
+
+  const code = els.couponCode.value.trim();
+  if (!code) {
+    els.couponStatus.textContent = "Enter a coupon code.";
+    return;
+  }
+
+  els.couponStatus.textContent = "Checking coupon...";
+
+  try {
+    const payload = await postJson("/api/apply-coupon", {
+      code,
+      planType: selectedPlan?.planType || "monthly"
+    });
+    couponApplied = true;
+    els.continuePayment.disabled = false;
+    els.couponStatus.textContent = payload.message || "Coupon applied successfully. Your subscription is now active.";
+    await checkCurrentUser();
+  } catch (error) {
+    couponApplied = false;
+    els.continuePayment.disabled = true;
+    els.couponStatus.textContent = error.message || "Invalid coupon code.";
+  }
+}
+
+function continueAfterCoupon() {
+  if (!couponApplied) return;
+  navigateTo("/builder");
 }
 
 async function requestPasswordReset(event) {
@@ -1009,6 +1168,15 @@ async function resetPassword(event) {
 }
 
 els.buildPacket.addEventListener("click", () => {
+  if (!hasActiveSubscription()) {
+    navigateTo(currentUser ? "/pricing" : "/signin");
+    if (currentUser) {
+      els.subscriptionStatus.textContent = "An active subscription is required to use Ungate Builder.";
+    } else {
+      els.signInStatus.textContent = "Please sign in to use Ungate Builder.";
+    }
+    return;
+  }
   const data = buildPacket();
   showReviewPage(data);
 });
@@ -1027,6 +1195,10 @@ els.subscriptionLink.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("/pricing");
 });
+els.chooseMonthly.addEventListener("click", () => selectSubscriptionPlan("monthly"));
+els.chooseYearly.addEventListener("click", () => selectSubscriptionPlan("yearly"));
+els.applyCoupon.addEventListener("click", applyCouponCode);
+els.continuePayment.addEventListener("click", continueAfterCoupon);
 els.signInLink.addEventListener("click", (event) => {
   event.preventDefault();
   navigateTo("/signin");

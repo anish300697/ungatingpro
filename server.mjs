@@ -129,6 +129,8 @@ async function initDatabase() {
       plan VARCHAR(32) NULL,
       plan_type VARCHAR(32) NULL,
       payment_status VARCHAR(32) NULL,
+      coupon_code VARCHAR(64) NULL,
+      access_source VARCHAR(32) NULL,
       has_full_access TINYINT(1) NOT NULL DEFAULT 0,
       access_expires_at DATETIME NULL,
       subscription_started_at DATETIME NULL,
@@ -186,6 +188,8 @@ async function ensureUserSubscriptionColumns() {
     ["plan", "VARCHAR(32) NULL"],
     ["plan_type", "VARCHAR(32) NULL"],
     ["payment_status", "VARCHAR(32) NULL"],
+    ["coupon_code", "VARCHAR(64) NULL"],
+    ["access_source", "VARCHAR(32) NULL"],
     ["has_full_access", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["access_expires_at", "DATETIME NULL"],
     ["subscription_started_at", "DATETIME NULL"],
@@ -245,6 +249,8 @@ function publicUser(user) {
     plan: user.plan || user.plan_type || null,
     planType: user.plan_type || user.plan || null,
     paymentStatus: user.payment_status || null,
+    couponCode: user.coupon_code || null,
+    accessSource: user.access_source || null,
     hasFullAccess: Boolean(user.has_full_access),
     subscriptionStartedAt: user.subscription_started_at || null,
     subscriptionExpiresAt: user.subscription_expires_at || user.access_expires_at || null,
@@ -430,7 +436,7 @@ async function requireActiveAccess(request, response) {
   const user = await requireSignedIn(request, response);
   if (!user) return null;
   if (!hasActiveAccess(user)) {
-    sendJson(response, 402, { error: "An active subscription or free trial is required to use this feature." });
+    sendJson(response, 403, { error: "Subscription required. An active subscription is required to use this feature." });
     return null;
   }
   return user;
@@ -752,9 +758,15 @@ async function handleApplyCoupon(request, response) {
   try {
     const payload = await readJsonBody(request);
     const code = String(payload.code || "").trim().toUpperCase();
+    const planType = String(payload.planType || "monthly").trim().toLowerCase();
 
     if (code !== "FREEALL") {
       sendJson(response, 400, { success: false, message: "Invalid coupon code." });
+      return;
+    }
+
+    if (!plans[planType]) {
+      sendJson(response, 400, { success: false, message: "Select a valid monthly or yearly plan." });
       return;
     }
 
@@ -762,30 +774,33 @@ async function handleApplyCoupon(request, response) {
       `
         UPDATE users
         SET subscription_status = 'active',
-            plan = 'free_all',
-            plan_type = 'free_all',
+            plan = :planType,
+            plan_type = :planType,
+            coupon_code = 'FREEALL',
+            access_source = 'coupon',
             payment_status = 'coupon',
             has_full_access = 1,
             access_expires_at = NULL,
-            subscription_started_at = COALESCE(subscription_started_at, NOW()),
+            subscription_started_at = NOW(),
             subscription_expires_at = NULL
         WHERE id = :userId
       `,
-      { userId: user.id }
+      { userId: user.id, planType }
     );
 
     await dbPool.execute(
       `
         INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
-        VALUES (:userId, 'free_all', 'FREEALL', 0, 0, 'coupon')
+        VALUES (:userId, :planType, 'FREEALL', 0, 0, 'coupon')
       `,
-      { userId: user.id }
+      { userId: user.id, planType }
     );
 
     sendJson(response, 200, {
       success: true,
-      plan: "free_all",
-      access: "full"
+      plan: planType,
+      access: "full",
+      message: "Coupon applied successfully. Your subscription is now active."
     });
   } catch (error) {
     sendJson(response, 500, { success: false, message: "Could not apply coupon." });
@@ -1175,6 +1190,9 @@ async function appendMasterFile(pdfDoc, file) {
 }
 
 async function handleMasterPdfGeneration(request, response) {
+  const user = await requireActiveAccess(request, response);
+  if (!user) return;
+
   try {
     const body = await readRequestBody(request);
     const parts = parseMultipart(body, request.headers["content-type"]);
@@ -1236,6 +1254,7 @@ function getSafeStaticPath(pathname) {
     "/reset-password",
     "/pricing",
     "/subscription",
+    "/coupon",
     "/payment",
     "/builder",
     "/dashboard",
