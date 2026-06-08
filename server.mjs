@@ -6,12 +6,14 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import mammoth from "mammoth";
 import heicConvert from "heic-convert";
 import mysql from "mysql2/promise";
+import nodemailer from "nodemailer";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
 const sessionCookieName = "a2z_session";
 const sessionDays = 14;
+const resetTokenMinutes = 60;
 
 let dbPool = null;
 let dbReady = false;
@@ -126,6 +128,18 @@ async function initDatabase() {
     )
   `);
 
+  await dbPool.execute(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      expires_at DATETIME NOT NULL,
+      used_at DATETIME NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   await seedMasterAccount();
   dbReady = true;
 }
@@ -135,6 +149,10 @@ function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
   const hash = pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("hex");
   return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
+
+function hashToken(token) {
+  return pbkdf2Sync(token, "a2z-password-reset", 100000, 32, "sha256").toString("hex");
 }
 
 function verifyPassword(password, storedHash) {
@@ -159,6 +177,42 @@ function publicUser(user) {
     status: user.status,
     isMaster: Boolean(user.is_master)
   };
+}
+
+function getPublicBaseUrl(request) {
+  const configured = process.env.PUBLIC_APP_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  const proto = request.headers["x-forwarded-proto"] || (process.env.NODE_ENV === "production" ? "https" : "http");
+  const requestHost = request.headers["x-forwarded-host"] || request.headers.host || `${host}:${port}`;
+  return `${proto}://${requestHost}`;
+}
+
+function hasSmtpConfig() {
+  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+}
+
+async function sendPasswordResetEmail(to, resetUrl) {
+  if (!hasSmtpConfig()) {
+    throw new Error("Email service is not configured. Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, and PUBLIC_APP_URL.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "").toLowerCase() === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    }
+  });
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject: "Reset your A2Z UNGATING password",
+    text: `Use this secure link to reset your password. It expires in ${resetTokenMinutes} minutes:\n\n${resetUrl}`,
+    html: `<p>Use this secure link to reset your password. It expires in ${resetTokenMinutes} minutes.</p><p><a href="${resetUrl}">Reset password</a></p>`
+  });
 }
 
 async function seedMasterAccount() {
@@ -321,6 +375,94 @@ async function handleSignOut(request, response) {
     if (token) await dbPool.execute("DELETE FROM sessions WHERE id = :token", { token });
   }
   sendJsonWithHeaders(response, 200, { ok: true }, { "Set-Cookie": getClearCookieHeader(request) });
+}
+
+async function handlePasswordResetRequest(request, response) {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const email = normalizeEmail(payload.email);
+    const neutralMessage = "If an active account exists for that email, a password reset link has been sent.";
+
+    if (!email) {
+      sendJson(response, 400, { error: "Email address is required." });
+      return;
+    }
+
+    const [rows] = await dbPool.execute("SELECT id, email, status FROM users WHERE email = :email LIMIT 1", { email });
+    const user = rows[0];
+
+    if (user?.status === "active") {
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = hashToken(token);
+      const expiresAt = new Date(Date.now() + resetTokenMinutes * 60 * 1000);
+      await dbPool.execute(
+        "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (:userId, :tokenHash, :expiresAt)",
+        { userId: user.id, tokenHash, expiresAt }
+      );
+
+      const resetUrl = `${getPublicBaseUrl(request)}/#reset-password?token=${encodeURIComponent(token)}`;
+      await sendPasswordResetEmail(user.email, resetUrl);
+    }
+
+    sendJson(response, 200, { message: neutralMessage });
+  } catch (error) {
+    sendJson(response, 500, { error: `Could not send password reset email: ${error.message}` });
+  }
+}
+
+async function handlePasswordReset(request, response) {
+  if (!requireDatabase(response)) return;
+
+  try {
+    const payload = await readJsonBody(request);
+    const token = String(payload.token || "");
+    const password = String(payload.password || "");
+
+    if (!token || !password) {
+      sendJson(response, 400, { error: "Reset token and new password are required." });
+      return;
+    }
+
+    if (password.length < 8) {
+      sendJson(response, 400, { error: "Password must be at least 8 characters." });
+      return;
+    }
+
+    const tokenHash = hashToken(token);
+    const [rows] = await dbPool.execute(
+      `
+        SELECT password_resets.id, password_resets.user_id
+        FROM password_resets
+        JOIN users ON users.id = password_resets.user_id
+        WHERE password_resets.token_hash = :tokenHash
+          AND password_resets.used_at IS NULL
+          AND password_resets.expires_at > NOW()
+          AND users.status = 'active'
+        LIMIT 1
+      `,
+      { tokenHash }
+    );
+
+    const reset = rows[0];
+    if (!reset) {
+      sendJson(response, 400, { error: "This password reset link is invalid or expired." });
+      return;
+    }
+
+    const passwordHash = hashPassword(password);
+    await dbPool.execute("UPDATE users SET password_hash = :passwordHash WHERE id = :userId", {
+      passwordHash,
+      userId: reset.user_id
+    });
+    await dbPool.execute("UPDATE password_resets SET used_at = NOW() WHERE id = :id", { id: reset.id });
+    await dbPool.execute("DELETE FROM sessions WHERE user_id = :userId", { userId: reset.user_id });
+
+    sendJson(response, 200, { message: "Password updated. Please sign in with your new password." });
+  } catch (error) {
+    sendJson(response, 500, { error: `Could not reset password: ${error.message}` });
+  }
 }
 
 async function handleCurrentUser(request, response) {
@@ -848,6 +990,16 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/auth/sign-out") {
     await handleSignOut(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/auth/request-password-reset") {
+    await handlePasswordResetRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/auth/reset-password") {
+    await handlePasswordReset(request, response);
     return;
   }
 

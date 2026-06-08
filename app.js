@@ -64,19 +64,23 @@ const els = {
   createEmail: document.querySelector("#createEmail"),
   createPassword: document.querySelector("#createPassword"),
   createAccountStatus: document.querySelector("#createAccountStatus"),
+  forgotPasswordOpen: document.querySelector("#forgotPasswordOpen"),
+  forgotPasswordForm: document.querySelector("#forgotPasswordForm"),
+  resetEmail: document.querySelector("#resetEmail"),
+  forgotPasswordStatus: document.querySelector("#forgotPasswordStatus"),
+  resetPasswordForm: document.querySelector("#resetPasswordForm"),
+  newPassword: document.querySelector("#newPassword"),
+  resetPasswordStatus: document.querySelector("#resetPasswordStatus"),
   accountPanel: document.querySelector("#accountPanel"),
   accountName: document.querySelector("#accountName"),
   accountEmail: document.querySelector("#accountEmail"),
-  signOutButton: document.querySelector("#signOutButton"),
-  adminPanel: document.querySelector("#adminPanel"),
-  adminUsers: document.querySelector("#adminUsers"),
-  adminStatus: document.querySelector("#adminStatus"),
-  refreshUsers: document.querySelector("#refreshUsers")
+  signOutButton: document.querySelector("#signOutButton")
 };
 
 let fileUrls = [];
 let packetDocumentOrder = [];
 let currentUser = null;
+let resetToken = "";
 
 const requiredEvidence = [
   {
@@ -784,7 +788,6 @@ function renderAccount(user) {
   currentUser = user;
   if (!user) {
     els.accountPanel.classList.add("is-hidden");
-    els.adminPanel.classList.add("is-hidden");
     els.signInLink.textContent = "Sign In";
     return;
   }
@@ -792,14 +795,7 @@ function renderAccount(user) {
   els.accountPanel.classList.remove("is-hidden");
   els.accountName.textContent = user.name || "Account";
   els.accountEmail.textContent = user.email || "";
-  els.signInLink.textContent = user.isMaster || user.role === "admin" ? "Admin" : "Account";
-
-  if (user.isMaster || user.role === "admin") {
-    els.adminPanel.classList.remove("is-hidden");
-    loadAdminUsers();
-  } else {
-    els.adminPanel.classList.add("is-hidden");
-  }
+  els.signInLink.textContent = "Account";
 }
 
 async function checkCurrentUser() {
@@ -821,10 +817,14 @@ async function handleSignIn(event) {
       password: els.signInPassword.value
     });
     els.signInForm.reset();
+    els.forgotPasswordOpen.classList.add("is-hidden");
+    els.forgotPasswordForm.classList.add("is-hidden");
     els.signInStatus.textContent = "Signed in.";
     renderAccount(payload.user);
   } catch (error) {
     els.signInStatus.textContent = error.message;
+    els.forgotPasswordOpen.classList.remove("is-hidden");
+    els.resetEmail.value = els.signInEmail.value;
   }
 }
 
@@ -856,56 +856,53 @@ async function signOut() {
   }
 }
 
-function renderAdminUsers(users) {
-  if (!users.length) {
-    els.adminUsers.className = "admin-users empty-state";
-    els.adminUsers.textContent = "No public users yet.";
-    return;
-  }
-
-  els.adminUsers.className = "admin-users";
-  els.adminUsers.innerHTML = users
-    .map(
-      (user) => `
-        <div class="admin-user-row">
-          <div>
-            <strong>${escapeHtml(user.name)}</strong>
-            <span>${escapeHtml(user.email)}</span>
-          </div>
-          <span class="user-status ${user.status === "active" ? "is-active-user" : ""}">${escapeHtml(user.status)}</span>
-          <button type="button" data-user-id="${user.id}" data-status="${user.status === "active" ? "disabled" : "active"}">
-            ${user.status === "active" ? "Disable" : "Enable"}
-          </button>
-        </div>`
-    )
-    .join("");
+function showForgotPasswordForm() {
+  els.forgotPasswordForm.classList.remove("is-hidden");
+  els.forgotPasswordStatus.textContent = "";
 }
 
-async function loadAdminUsers() {
-  if (!currentUser || (currentUser.role !== "admin" && !currentUser.isMaster)) return;
-  els.adminStatus.textContent = "Loading users...";
+async function requestPasswordReset(event) {
+  event.preventDefault();
+  els.forgotPasswordStatus.textContent = "Sending reset link...";
 
   try {
-    const payload = await parseJsonResponse(await fetch("/api/admin/users"));
-    renderAdminUsers(payload.users || []);
-    els.adminStatus.textContent = "";
-  } catch (error) {
-    els.adminStatus.textContent = error.message;
-  }
-}
-
-async function updateAdminUser(button) {
-  els.adminStatus.textContent = "Updating user...";
-  try {
-    await postJson("/api/admin/users/update", {
-      userId: button.dataset.userId,
-      status: button.dataset.status
+    const payload = await postJson("/api/auth/request-password-reset", {
+      email: els.resetEmail.value
     });
-    await loadAdminUsers();
-    els.adminStatus.textContent = "User updated.";
+    els.forgotPasswordStatus.textContent = payload.message || "If an account exists, a reset link has been sent.";
   } catch (error) {
-    els.adminStatus.textContent = error.message;
+    els.forgotPasswordStatus.textContent = error.message;
   }
+}
+
+async function resetPassword(event) {
+  event.preventDefault();
+  els.resetPasswordStatus.textContent = "Updating password...";
+
+  try {
+    const payload = await postJson("/api/auth/reset-password", {
+      token: resetToken,
+      password: els.newPassword.value
+    });
+    els.resetPasswordForm.reset();
+    els.resetPasswordStatus.textContent = payload.message || "Password updated.";
+    resetToken = "";
+    window.history.replaceState(null, "", "#account");
+    els.forgotPasswordOpen.classList.add("is-hidden");
+  } catch (error) {
+    els.resetPasswordStatus.textContent = error.message;
+  }
+}
+
+function handleResetPasswordLink() {
+  const hash = window.location.hash || "";
+  if (!hash.startsWith("#reset-password")) return;
+  const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+  resetToken = new URLSearchParams(query).get("token") || "";
+  if (!resetToken) return;
+  showSignInPage();
+  els.resetPasswordForm.classList.remove("is-hidden");
+  els.resetPasswordStatus.textContent = "Enter a new password to complete the reset.";
 }
 
 els.buildPacket.addEventListener("click", () => {
@@ -942,7 +939,9 @@ els.startBuilder.addEventListener("click", showEntryPage);
 els.signInForm.addEventListener("submit", handleSignIn);
 els.createAccountForm.addEventListener("submit", handleCreateAccount);
 els.signOutButton.addEventListener("click", signOut);
-els.refreshUsers.addEventListener("click", loadAdminUsers);
+els.forgotPasswordOpen.addEventListener("click", showForgotPasswordForm);
+els.forgotPasswordForm.addEventListener("submit", requestPasswordReset);
+els.resetPasswordForm.addEventListener("submit", resetPassword);
 els.convertWord.addEventListener("click", convertWordToPdf);
 els.convertPhotos.addEventListener("click", convertPhotosToPdf);
 fields.wordFiles.addEventListener("change", updateConverterLists);
@@ -951,11 +950,6 @@ els.documentOrderList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   movePacketDocument(Number(button.dataset.index), button.dataset.action);
-});
-els.adminUsers.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-user-id]");
-  if (!button) return;
-  updateAdminUser(button);
 });
 
 Object.values(fields).forEach((field) => {
@@ -967,3 +961,4 @@ buildPacket();
 updateConverterLists();
 setupDragAndDrop();
 checkCurrentUser();
+handleResetPasswordLink();

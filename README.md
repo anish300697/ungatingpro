@@ -49,10 +49,17 @@ DB_PORT=3306
 MASTER_ADMIN_EMAIL=your_private_admin_email
 MASTER_ADMIN_PASSWORD=your_private_admin_password
 MASTER_ADMIN_NAME=Master Admin
+PUBLIC_APP_URL=https://your-domain.com
+SMTP_HOST=your_smtp_host
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASSWORD=your_smtp_password
+SMTP_FROM=your_from_email
 NODE_ENV=production
 ```
 
-The master account is created privately by the server and is not displayed on the public website. After signing in with that account, the private admin panel can manage public user accounts.
+The master account is created privately by the server and is not displayed on the public website. Password reset links are emailed through the SMTP settings above and expire after 60 minutes.
 
 ## Local Development
 

@@ -223,6 +223,7 @@
               <input id="signInPassword" type="password" autocomplete="current-password" required />
             </label>
             <button type="submit">Sign In</button>
+            <button id="forgotPasswordOpen" type="button" class="link-button is-hidden">Forgot password?</button>
             <p id="signInStatus" class="download-status" aria-live="polite"></p>
           </form>
 
@@ -243,6 +244,26 @@
             <button type="submit">Create Account</button>
             <p id="createAccountStatus" class="download-status" aria-live="polite"></p>
           </form>
+
+          <form id="forgotPasswordForm" class="auth-card is-hidden">
+            <h2>Reset Password</h2>
+            <label>
+              Verify email address
+              <input id="resetEmail" type="email" autocomplete="email" required />
+            </label>
+            <button type="submit">Send Reset Link</button>
+            <p id="forgotPasswordStatus" class="download-status" aria-live="polite"></p>
+          </form>
+
+          <form id="resetPasswordForm" class="auth-card is-hidden">
+            <h2>Choose New Password</h2>
+            <label>
+              New password
+              <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+            <button type="submit">Update Password</button>
+            <p id="resetPasswordStatus" class="download-status" aria-live="polite"></p>
+          </form>
         </section>
 
         <section id="accountPanel" class="account-panel is-hidden">
@@ -253,18 +274,6 @@
               <p id="accountEmail"></p>
             </div>
             <button id="signOutButton" type="button" class="secondary">Sign Out</button>
-          </div>
-
-          <div id="adminPanel" class="admin-panel is-hidden">
-            <div class="admin-heading">
-              <div>
-                <p class="eyebrow">Master Access</p>
-                <h2>User Management</h2>
-              </div>
-              <button id="refreshUsers" type="button" class="secondary">Refresh</button>
-            </div>
-            <div id="adminUsers" class="admin-users empty-state">No users loaded yet.</div>
-            <p id="adminStatus" class="download-status" aria-live="polite"></p>
           </div>
         </section>
       </section>

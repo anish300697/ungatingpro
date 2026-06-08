@@ -54,6 +54,16 @@ button.secondary {
   box-shadow: none;
 }
 
+button.link-button {
+  justify-self: start;
+  min-height: auto;
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 800;
+}
+
 .app-shell {
   width: 100%;
   min-height: 100vh;
