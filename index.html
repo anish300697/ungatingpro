@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project X</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a class="site-brand" id="homeLink" href="#home" aria-label="Project X home">Project X</a>
+        <div class="site-links">
+          <a id="ungateBuilderLink" href="#builder">Ungate Builder</a>
+          <a id="convertLink" href="#convert">Convert</a>
+          <a id="subscriptionLink" href="#subscription">Subscription</a>
+          <a href="#account">My Account</a>
+        </div>
+      </nav>
+
+      <section id="landingPage" class="page landing-page" aria-label="Project X landing page">
+        <header class="landing-hero">
+          <div class="landing-copy">
+            <p class="eyebrow">Seller Approval Automation</p>
+            <h1>The Ultimate Ungating</h1>
+            <p>Build polished approval packets from supplier invoices, purchase proofs, and product photographs without wrestling with document order, formatting, or PDF assembly.</p>
+            <div class="landing-actions">
+              <button id="startBuilder" type="button">Open Ungate Builder</button>
+              <a id="viewSubscription" href="#subscription">View Subscription</a>
+            </div>
+          </div>
+          <div class="landing-visual" aria-hidden="true">
+            <svg viewBox="0 0 640 420" role="img">
+              <defs>
+                <linearGradient id="heroBox" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#F5C16D" />
+                  <stop offset="1" stop-color="#D97C2B" />
+                </linearGradient>
+                <linearGradient id="heroDoc" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#FFFFFF" />
+                  <stop offset="1" stop-color="#EAF2F8" />
+                </linearGradient>
+              </defs>
+              <rect x="34" y="42" width="568" height="334" rx="32" fill="#F7FBFA" />
+              <circle cx="548" cy="82" r="34" fill="#2E75B6" opacity=".18" />
+              <circle cx="92" cy="330" r="46" fill="#D97C2B" opacity=".16" />
+              <rect x="84" y="126" width="168" height="144" rx="16" fill="url(#heroBox)" />
+              <path d="M84 166h168M168 126v144" stroke="#9B5427" stroke-width="7" opacity=".38" />
+              <path d="M126 270c36 36 100 36 136 0" fill="none" stroke="#0F4C81" stroke-width="9" stroke-linecap="round" />
+              <rect x="304" y="76" width="204" height="284" rx="20" fill="url(#heroDoc)" stroke="#BFD4E4" stroke-width="3" />
+              <rect x="334" y="112" width="120" height="14" rx="7" fill="#0F4C81" />
+              <rect x="334" y="152" width="138" height="9" rx="4" fill="#AFC7D9" />
+              <rect x="334" y="176" width="112" height="9" rx="4" fill="#AFC7D9" />
+              <rect x="334" y="216" width="138" height="74" rx="10" fill="#FFFFFF" stroke="#D5E1EA" stroke-width="2" />
+              <path d="M354 256h88M354 238h106M354 274h74" stroke="#2E75B6" stroke-width="5" stroke-linecap="round" />
+              <circle cx="504" cy="112" r="30" fill="#146C5F" />
+              <path d="M490 112l10 11 21-27" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M266 208h72" stroke="#D97C2B" stroke-width="8" stroke-linecap="round" />
+              <path d="M318 188l22 20-22 20" fill="none" stroke="#D97C2B" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+        </header>
+
+        <section class="business-panels" aria-label="Project X features">
+          <article>
+            <span>01</span>
+            <h2>Document Assembly</h2>
+            <p>Place SOP, invoices, photos, and supplier proofs into one approval-ready PDF.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h2>Seller Details</h2>
+            <p>Capture ASIN, business identity, supplier, invoice, and address information in one clean flow.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h2>Packet Review</h2>
+            <p>Verify the generated master packet before saving the final ASIN-named PDF.</p>
+          </article>
+        </section>
+      </section>
+
+      <section id="convertPage" class="page convert-page is-hidden" aria-label="Document converters">
+        <header class="convert-hero">
+          <div>
+            <p class="eyebrow">Document Tools</p>
+            <h1>Convert & Merge</h1>
+            <p>Turn seller documents and product photographs into clean PDF files for supplier records, approval packets, and business use.</p>
+          </div>
+          <div class="convert-graphic" aria-hidden="true">
+            <svg viewBox="0 0 420 280" role="img">
+              <rect x="34" y="38" width="352" height="204" rx="24" fill="#F7FBFA" />
+              <rect x="72" y="78" width="96" height="126" rx="12" fill="#FFFFFF" stroke="#BFD4E4" stroke-width="3" />
+              <path d="M94 112h46M94 138h58M94 164h42" stroke="#2E75B6" stroke-width="6" stroke-linecap="round" />
+              <rect x="220" y="74" width="116" height="92" rx="14" fill="#F5C16D" />
+              <path d="M236 138l26-28 22 22 14-16 20 24" fill="none" stroke="#9B5427" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M172 142h58" stroke="#D97C2B" stroke-width="8" stroke-linecap="round" />
+              <path d="M214 122l22 20-22 20" fill="none" stroke="#D97C2B" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="318" cy="190" r="26" fill="#146C5F" />
+              <path d="M306 190l9 9 18-24" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+        </header>
+
+        <section class="converter-grid">
+          <article class="converter-card">
+            <div class="converter-icon">W</div>
+            <div>
+              <h2>Word to PDF Converter</h2>
+              <p>Upload one or more .docx documents and render them into one PDF with the hosted converter.</p>
+            </div>
+            <label class="converter-upload" for="wordFiles">
+              <span>Choose Word documents</span>
+              <input id="wordFiles" type="file" multiple accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            </label>
+            <div id="wordFileList" class="converter-list empty-state">No Word files selected yet.</div>
+            <button id="convertWord" type="button">Convert Word to PDF</button>
+            <p id="wordConvertStatus" class="download-status" aria-live="polite"></p>
+          </article>
+
+          <article class="converter-card">
+            <div class="converter-icon photo-icon">P</div>
+            <div>
+              <h2>Photos to PDF Converter</h2>
+              <p>Upload one or more JPG, PNG, or HEIC photos and merge them into one PDF.</p>
+            </div>
+            <label class="converter-upload" for="photoFiles">
+              <span>Choose photos</span>
+              <input id="photoFiles" type="file" multiple accept=".png,.jpg,.jpeg,.heic,.heif,image/png,image/jpeg,image/heic,image/heif" />
+            </label>
+            <div id="photoFileList" class="converter-list empty-state">No photos selected yet.</div>
+            <button id="convertPhotos" type="button">Convert Photos to PDF</button>
+            <p id="photoConvertStatus" class="download-status" aria-live="polite"></p>
+          </article>
+        </section>
+      </section>
+
+      <section id="subscriptionPage" class="page subscription-page is-hidden" aria-label="Subscription plans">
+        <header class="subscription-hero">
+          <div>
+            <p class="eyebrow">Project X Subscription</p>
+            <h1>Unlimited Generate</h1>
+            <p>Create unlimited ungating packets for your supplier invoices, product photos, and purchase proofs.</p>
+          </div>
+          <div class="subscription-graphic" aria-hidden="true">
+            <svg viewBox="0 0 360 260" role="img">
+              <rect x="24" y="28" width="312" height="204" rx="22" fill="#F7FBFA" />
+              <rect x="58" y="70" width="118" height="96" rx="12" fill="#F5C16D" />
+              <path d="M58 98h118M117 70v96" stroke="#9B5427" stroke-width="5" opacity=".35" />
+              <rect x="198" y="54" width="104" height="146" rx="14" fill="#FFFFFF" stroke="#BFD4E4" stroke-width="3" />
+              <path d="M222 88h54M222 112h62M222 136h44" stroke="#2E75B6" stroke-width="6" stroke-linecap="round" />
+              <circle cx="292" cy="64" r="22" fill="#146C5F" />
+              <path d="M282 64l7 8 15-19" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M86 181c34 26 82 26 116 0" fill="none" stroke="#0F4C81" stroke-width="8" stroke-linecap="round" />
+            </svg>
+          </div>
+        </header>
+
+        <section class="pricing-grid" aria-label="Pricing options">
+          <article class="pricing-card">
+            <div class="pricing-top">
+              <span>Monthly</span>
+              <h2>Unlimited Generate</h2>
+            </div>
+            <div class="price-line">
+              <strong>$9.99</strong>
+              <span>/mo</span>
+            </div>
+            <p>Flexible monthly access for sellers preparing approval packets as needed.</p>
+            <ul>
+              <li>Unlimited packet generation</li>
+              <li>SOP letter formatting</li>
+              <li>Invoice, photo, and support document merging</li>
+              <li>ASIN-named PDF downloads</li>
+            </ul>
+            <button type="button">Choose Monthly</button>
+          </article>
+
+          <article class="pricing-card featured">
+            <div class="plan-badge">Best Value</div>
+            <div class="pricing-top">
+              <span>Yearly</span>
+              <h2>Unlimited Generate</h2>
+            </div>
+            <div class="price-line">
+              <strong>$96</strong>
+              <span>/year</span>
+            </div>
+            <p>One-time yearly deduction. Equivalent to <strong>$8/mo</strong> for high-volume sellers.</p>
+            <ul>
+              <li>Everything in monthly</li>
+              <li>Lower effective monthly rate</li>
+              <li>Ideal for ongoing replenishment and new ASIN approval work</li>
+              <li>Cleaner yearly billing</li>
+            </ul>
+            <button type="button">Choose Yearly</button>
+          </article>
+        </section>
+      </section>
+
+      <section id="entryPage" class="page page-entry is-hidden" aria-label="Ungating packet form">
+        <header class="page-header entry-hero">
+          <div class="hero-copy">
+            <h1>Ungate Builder</h1>
+          </div>
+          <div class="seller-visual" aria-hidden="true">
+            <svg viewBox="0 0 520 300" role="img">
+              <defs>
+                <linearGradient id="boxGradient" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#F4B860" />
+                  <stop offset="1" stop-color="#D97C2B" />
+                </linearGradient>
+                <linearGradient id="cardGradient" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#FFFFFF" />
+                  <stop offset="1" stop-color="#EAF2F8" />
+                </linearGradient>
+              </defs>
+              <rect x="22" y="36" width="476" height="220" rx="24" fill="#F6FAF8" />
+              <path d="M74 188h372" stroke="#D7E4DE" stroke-width="6" stroke-linecap="round" />
+              <rect x="82" y="82" width="128" height="116" rx="10" fill="url(#boxGradient)" />
+              <path d="M82 116h128M146 82v116" stroke="#A45624" stroke-width="5" opacity=".45" />
+              <path d="M112 196c28 28 76 28 104 0" fill="none" stroke="#0F4C81" stroke-width="8" stroke-linecap="round" />
+              <rect x="244" y="58" width="168" height="210" rx="16" fill="url(#cardGradient)" stroke="#BFD4E4" stroke-width="3" />
+              <rect x="270" y="88" width="92" height="12" rx="6" fill="#0F4C81" />
+              <rect x="270" y="118" width="112" height="8" rx="4" fill="#AFC7D9" />
+              <rect x="270" y="140" width="84" height="8" rx="4" fill="#AFC7D9" />
+              <rect x="270" y="178" width="116" height="46" rx="8" fill="#FFFFFF" stroke="#D5E1EA" stroke-width="2" />
+              <path d="M282 212h88M282 200h88M282 188h88" stroke="#2E75B6" stroke-width="4" stroke-linecap="round" />
+              <circle cx="418" cy="72" r="24" fill="#2E75B6" />
+              <path d="M406 72l8 8 16-18" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+        </header>
+
+        <form id="packetForm" class="panel form-panel">
+          <section class="form-section">
+            <div class="section-title">
+              <span>1</span>
+              <div>
+                <h2>Marketplace & Product</h2>
+                <p>Enter the exact product and marketplace details for the ungating request.</p>
+              </div>
+            </div>
+
+            <div class="form-grid two-col">
+              <label>
+                Marketplace
+                <select id="marketplace">
+                  <option>Amazon US</option>
+                  <option>Amazon Canada</option>
+                  <option>Amazon UK</option>
+                  <option>Walmart Marketplace</option>
+                </select>
+              </label>
+
+              <label>
+                ASIN
+                <input id="asin" placeholder="B0XXXXXXX" required />
+              </label>
+
+              <label class="span-all">
+                Product description
+                <textarea id="productDescription" rows="3" placeholder="Brand, model, size, color, UPC if available, and product type" required></textarea>
+              </label>
+
+              <label>
+                Units purchased
+                <input id="unitsPurchased" type="number" min="1" value="10" required />
+              </label>
+
+              <label class="business-name-field">
+                Buyer / business name
+                <input id="buyerName" placeholder="Your legal business name" />
+              </label>
+
+              <label class="business-address-field">
+                Business address
+                <textarea id="billingAddress" rows="3" placeholder="Street address, city, state/province, postal code, country"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title">
+              <span>2</span>
+              <div>
+                <h2>Supplier & Invoice</h2>
+                <p>Add the supplier and invoice details that should appear in the SOP.</p>
+              </div>
+            </div>
+
+            <div class="form-grid two-col">
+              <label>
+                Supplier name
+                <input id="supplierName" placeholder="Authorized distributor or supplier" required />
+              </label>
+
+              <label>
+                Invoice / receipt number
+                <input id="invoiceNumber" placeholder="INV-000123" />
+              </label>
+
+              <label>
+                Invoice date
+                <input id="invoiceDate" type="date" />
+              </label>
+
+              <label class="span-all">
+                Purchase notes
+                <textarea id="purchaseNotes" rows="4" placeholder="Briefly describe how the goods were purchased and how the documents connect."></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title">
+              <span>3</span>
+              <div>
+                <h2>Upload Proofs</h2>
+                <p>Upload invoice/sales receipt, product photographs, delivery slips, and other supplier proofs.</p>
+              </div>
+            </div>
+
+            <label class="upload-zone" for="proofFiles">
+              <span>Choose invoice, photographs, delivery slips, and supporting files</span>
+              <input id="proofFiles" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.txt,.csv" />
+            </label>
+
+            <div class="selected-documents">
+              <div class="selected-documents-heading">
+                <h3>Selected Documents</h3>
+                <span id="fileCount">0 files selected</span>
+              </div>
+              <div id="documentIndex" class="document-index empty-state">No files selected yet.</div>
+            </div>
+          </section>
+
+          <footer class="form-footer">
+            <div>
+              <p id="formStatus" class="form-status">Ready when your product, supplier, and proof files are entered.</p>
+            </div>
+            <button id="buildPacket" type="button">Build Packet</button>
+          </footer>
+        </form>
+      </section>
+
+      <section id="reviewPage" class="page page-review is-hidden" aria-label="Ungating packet review">
+        <header class="review-header">
+          <div>
+            <h1>Verify Master PDF</h1>
+            <p id="mergeStatus" class="status-copy is-hidden"></p>
+          </div>
+          <button id="editPacket" type="button" class="secondary">Edit Information</button>
+        </header>
+
+        <section class="review-grid">
+          <aside class="panel review-sidebar">
+            <div class="score-ring" id="scoreRing">0%</div>
+            <h2 id="readinessTitle">Packet readiness</h2>
+            <p id="readinessHint" class="status-copy">Review the merged packet before saving.</p>
+            <ul id="checklist" class="checklist"></ul>
+          </aside>
+
+          <section class="panel master-packet-panel" id="masterPacketPanel">
+            <div class="section-heading">
+              <h2>Master PDF Packet</h2>
+              <span id="packetStatus">Draft</span>
+            </div>
+            <section class="document-order-panel" aria-label="Arrange documents">
+              <div class="document-order-heading">
+                <h3>Arrange Documents</h3>
+                <p>SOP stays first. Move uploaded documents up or down before saving the final PDF.</p>
+              </div>
+              <div id="documentOrderList" class="document-order-list empty-state">No uploaded documents to arrange yet.</div>
+            </section>
+            <article id="masterPacket" class="master-packet"></article>
+            <footer class="save-footer">
+              <p id="downloadStatus" class="download-status" aria-live="polite"></p>
+              <button id="printPacket" type="button">Save PDF</button>
+            </footer>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="vendor/pdf-lib.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

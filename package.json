@@ -1,0 +1,18 @@
+{
+  "name": "project-x",
+  "version": "1.0.0",
+  "description": "Project X ungating packet builder and document converter.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check app.js"
+  },
+  "dependencies": {
+    "heic-convert": "^2.1.0",
+    "mammoth": "^1.8.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
