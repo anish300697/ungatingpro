@@ -10,7 +10,8 @@ A2Z UNGATING is a hosted ungating packet builder and document converter for sell
   - photographs
   - other supporting documents
 - Lets users review and reorder uploaded documents before saving the final packet.
-- Downloads master packets as `ASIN_INVOICE.pdf`.
+- Downloads master packets as `Ungating_Package.pdf` from the backend endpoint.
+- Generates master PDFs through `POST /api/generate-master-pdf`.
 - Converts `.docx` files into a merged PDF using the Node backend.
 - Converts JPG, PNG, HEIC, and HEIF photos into a merged PDF using the Node backend.
 

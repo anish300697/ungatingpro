@@ -456,48 +456,6 @@ function setActiveNav(activeLink) {
   activeLink?.classList.add("is-active");
 }
 
-function wrapText(text, font, size, maxWidth) {
-  const words = String(text).split(/\s+/).filter(Boolean);
-  const lines = [];
-  let line = "";
-
-  words.forEach((word) => {
-    const next = line ? `${line} ${word}` : word;
-    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
-      line = next;
-    } else {
-      if (line) lines.push(line);
-      line = word;
-    }
-  });
-
-  if (line) lines.push(line);
-  return lines;
-}
-
-const pdfTheme = {
-  width: 612,
-  height: 792,
-  margin: 54,
-  colors: {
-    text: [34, 34, 34],
-    header: [15, 76, 129],
-    accent: [46, 117, 182]
-  },
-  fonts: {
-    coverTitle: 24,
-    sectionHeader: 16,
-    subheader: 13,
-    body: 11,
-    footer: 8
-  },
-  lineHeight: 1.4
-};
-
-function rgbFromArray(values) {
-  return PDFLib.rgb(values[0] / 255, values[1] / 255, values[2] / 255);
-}
-
 function downloadBlob(bytes, fileName) {
   const blob = new Blob([bytes], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
@@ -580,7 +538,7 @@ function setupDropZone(zone, input, acceptTest) {
 }
 
 function setupDragAndDrop() {
-  setupDropZone(uploadZones.proofFiles, fields.proofFiles, (file) => /\.(pdf|png|jpe?g|webp|heic|heif|txt|csv)$/i.test(file.name));
+  setupDropZone(uploadZones.proofFiles, fields.proofFiles, (file) => /\.(pdf|png|jpe?g|heic|heif)$/i.test(file.name));
   setupDropZone(uploadZones.wordFiles, fields.wordFiles, (file) => /\.docx$/i.test(file.name));
   setupDropZone(uploadZones.photoFiles, fields.photoFiles, (file) => /\.(png|jpe?g|heic|heif)$/i.test(file.name));
 }
@@ -588,21 +546,6 @@ function setupDragAndDrop() {
 function updateConverterLists() {
   renderConverterList(Array.from(fields.wordFiles.files || []), els.wordFileList, "No Word files selected yet.");
   renderConverterList(Array.from(fields.photoFiles.files || []), els.photoFileList, "No photos selected yet.");
-}
-
-async function buildPhotosPdfBytes(files) {
-  const pdfDoc = await PDFLib.PDFDocument.create();
-  for (const file of files) {
-    await appendImageFile(pdfDoc, file);
-  }
-  pdfDoc.setTitle(getConverterFileName(files, "PHOTOS_TO_PDF"));
-  pdfDoc.setSubject("Photos merged into PDF");
-  pdfDoc.setCreator("A2Z UNGATING Convert");
-  return pdfDoc.save();
-}
-
-function hasBackendOnlyPhoto(files) {
-  return files.some((file) => /\.(heic|heif)$/i.test(file.name) || /image\/(heic|heif)/i.test(file.type));
 }
 
 async function buildPhotosPdfBytesWithBackend(files) {
@@ -632,33 +575,6 @@ async function buildPhotosPdfBytesWithBackend(files) {
   }
 
   return new Uint8Array(await response.arrayBuffer());
-}
-
-async function buildWordPdfBytes(files) {
-  const pdfDoc = await PDFLib.PDFDocument.create();
-  const fileSummary = files
-    .map((file, index) => `${index + 1}. ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`)
-    .join("\n");
-
-  await addTextPages(pdfDoc, "Word to PDF Package", [
-    {
-      text:
-        "The selected Word document(s) are included in this PDF package as file attachments. A visual Word-to-PDF render requires a server-side document conversion engine."
-    },
-    { heading: "Included Word Documents", text: fileSummary }
-  ]);
-
-  for (const file of files) {
-    await pdfDoc.attach(await file.arrayBuffer(), file.name, {
-      mimeType: file.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      description: "Original Word document selected in A2Z UNGATING Convert"
-    });
-  }
-
-  pdfDoc.setTitle(getConverterFileName(files, "WORD_TO_PDF"));
-  pdfDoc.setSubject("Word documents packaged into PDF");
-  pdfDoc.setCreator("A2Z UNGATING Convert");
-  return pdfDoc.save();
 }
 
 async function buildWordPdfBytesWithBackend(files) {
@@ -702,7 +618,7 @@ async function convertPhotosToPdf() {
   els.photoConvertStatus.textContent = `Building ${fileName}.pdf...`;
 
   try {
-    const bytes = hasBackendOnlyPhoto(files) ? await buildPhotosPdfBytesWithBackend(files) : await buildPhotosPdfBytes(files);
+    const bytes = await buildPhotosPdfBytesWithBackend(files);
     downloadBlob(bytes, fileName);
     els.photoConvertStatus.textContent = `${fileName}.pdf downloaded.`;
   } catch (error) {
@@ -731,234 +647,71 @@ async function convertWordToPdf() {
   }
 }
 
-async function addTextPages(pdfDoc, title, paragraphs) {
-  const { StandardFonts } = PDFLib;
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const width = pdfTheme.width;
-  const height = pdfTheme.height;
-  const margin = pdfTheme.margin;
-  const bodySize = pdfTheme.fonts.body;
-  const lineHeight = bodySize * pdfTheme.lineHeight;
-  const textColor = rgbFromArray(pdfTheme.colors.text);
-  const headerColor = rgbFromArray(pdfTheme.colors.header);
-  const accentColor = rgbFromArray(pdfTheme.colors.accent);
-  let page = pdfDoc.addPage([width, height]);
-  let y = height - margin;
-
-  function newPage() {
-    page = pdfDoc.addPage([width, height]);
-    y = height - margin;
-  }
-
-  if (title) {
-    page.drawText(title, {
-      x: margin,
-      y,
-      size: pdfTheme.fonts.coverTitle,
-      font: bold,
-      color: headerColor
-    });
-    y -= pdfTheme.fonts.coverTitle * pdfTheme.lineHeight;
-  }
-
-  paragraphs.forEach((paragraph) => {
-    if (paragraph.heading) {
-      if (y < margin + 42) newPage();
-      page.drawText(paragraph.heading, {
-        x: margin,
-        y,
-        size: pdfTheme.fonts.sectionHeader,
-        font: bold,
-        color: headerColor
-      });
-      y -= pdfTheme.fonts.sectionHeader * pdfTheme.lineHeight;
-    }
-
-    if (paragraph.subheader) {
-      if (y < margin + 36) newPage();
-      page.drawText(paragraph.subheader, {
-        x: margin,
-        y,
-        size: pdfTheme.fonts.subheader,
-        font: bold,
-        color: accentColor
-      });
-      y -= pdfTheme.fonts.subheader * pdfTheme.lineHeight;
-    }
-
-    const lines = wrapText(paragraph.text || "", font, bodySize, width - margin * 2);
-    lines.forEach((line) => {
-      if (y < margin) newPage();
-      page.drawText(line, {
-        x: margin,
-        y,
-        size: bodySize,
-        font,
-        color: textColor
-      });
-      y -= lineHeight;
-    });
-    y -= bodySize * 0.75;
-  });
+function getResponseFileName(response, fallback) {
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const match = /filename="?([^"]+)"?/i.exec(disposition);
+  return (match?.[1] || `${fallback}.pdf`).replace(/\.pdf$/i, "");
 }
 
-async function addSopPage(pdfDoc, data) {
-  const { StandardFonts } = PDFLib;
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const sop = buildSopParts(data);
-  const width = pdfTheme.width;
-  const height = pdfTheme.height;
-  const margin = pdfTheme.margin;
-  const textColor = rgbFromArray(pdfTheme.colors.text);
-  const headerColor = rgbFromArray(pdfTheme.colors.header);
-  const accentColor = rgbFromArray(pdfTheme.colors.accent);
-  const bodySize = pdfTheme.fonts.body;
-  const lineHeight = bodySize * pdfTheme.lineHeight;
-  let page = pdfDoc.addPage([width, height]);
-  let y = height - margin;
-
-  function newPage() {
-    drawFooter(page);
-    page = pdfDoc.addPage([width, height]);
-    y = height - margin;
-  }
-
-  function drawFooter(targetPage) {
-    targetPage.drawLine({
-      start: { x: margin, y: margin - 16 },
-      end: { x: width - margin, y: margin - 16 },
-      thickness: 0.6,
-      color: accentColor
-    });
-    targetPage.drawText(sop.footer, {
-      x: margin,
-      y: margin - 30,
-      size: pdfTheme.fonts.footer,
-      font: regular,
-      color: textColor
-    });
-  }
-
-  page.drawText(sop.title, {
-    x: margin,
-    y,
-    size: pdfTheme.fonts.coverTitle,
-    font: bold,
-    color: headerColor
-  });
-  y -= pdfTheme.fonts.coverTitle * 1.15;
-
-  page.drawLine({
-    start: { x: margin, y },
-    end: { x: width - margin, y },
-    thickness: 1.4,
-    color: accentColor
-  });
-  y -= 24;
-
-  const metaText = sop.meta.join("   |   ");
-  wrapText(metaText, bold, pdfTheme.fonts.subheader, width - margin * 2).forEach((line) => {
-    page.drawText(line, {
-      x: margin,
-      y,
-      size: pdfTheme.fonts.subheader,
-      font: bold,
-      color: accentColor
-    });
-    y -= pdfTheme.fonts.subheader * pdfTheme.lineHeight;
-  });
-  y -= 16;
-
-  sop.paragraphs.forEach((paragraph) => {
-    const lines = paragraph
-      .split("\n")
-      .flatMap((line) => wrapText(line, regular, bodySize, width - margin * 2));
-
-    lines.forEach((line) => {
-      if (y < margin + 28) newPage();
-      page.drawText(line, {
-        x: margin,
-        y,
-        size: bodySize,
-        font: regular,
-        color: textColor
-      });
-      y -= lineHeight;
-    });
-    y -= bodySize * 0.85;
-  });
-
-  drawFooter(page);
-}
-
-async function appendPdfFile(pdfDoc, file) {
-  const sourceBytes = await file.arrayBuffer();
-  const sourcePdf = await PDFLib.PDFDocument.load(sourceBytes, { ignoreEncryption: true });
-  const copiedPages = await pdfDoc.copyPages(sourcePdf, sourcePdf.getPageIndices());
-  copiedPages.forEach((page) => pdfDoc.addPage(page));
-}
-
-async function appendImageFile(pdfDoc, file) {
-  const bytes = await file.arrayBuffer();
-  const isPngFile = file.type === "image/png" || /\.png$/i.test(file.name);
-  const isJpgFile = file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
-
-  if (!isPngFile && !isJpgFile) {
-    await addTextPages(pdfDoc, "", [{ text: `${file.name} could not be embedded directly. Use JPG or PNG for automatic photo embedding.` }]);
-    return;
-  }
-
-  const image = isPngFile ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-  const page = pdfDoc.addPage([612, 792]);
-  const margin = pdfTheme.margin;
-  const maxWidth = 612 - margin * 2;
-  const maxHeight = 792 - margin * 2 - 28;
-  const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
-  const imageWidth = image.width * scale;
-  const imageHeight = image.height * scale;
-  const x = (612 - imageWidth) / 2;
-  const y = (792 - imageHeight) / 2;
-  page.drawImage(image, { x, y, width: imageWidth, height: imageHeight });
-}
-
-async function appendFileGroup(pdfDoc, files) {
-  for (const file of files) {
-    if (isPdf(file)) {
-      await appendPdfFile(pdfDoc, file);
-    } else if (isImage(file)) {
-      await appendImageFile(pdfDoc, file);
-    } else {
-      await addTextPages(pdfDoc, "", [{ text: `${file.name} is listed as supporting evidence but cannot be embedded directly by the browser PDF builder.` }]);
-    }
-  }
-}
-
-async function buildPdfBytes(data) {
-  if (!window.PDFLib) {
-    throw new Error("PDF builder library is not loaded.");
-  }
-
-  const pdfDoc = await PDFLib.PDFDocument.create();
+async function buildMasterPdfWithBackend(data) {
   syncPacketDocumentOrder(data.files, true);
 
-  await addSopPage(pdfDoc, data);
-  await appendFileGroup(pdfDoc, packetDocumentOrder);
+  if (!packetDocumentOrder.length) {
+    throw new Error("Upload at least one invoice, delivery slip, order confirmation, or product photo.");
+  }
 
-  pdfDoc.setTitle(getPacketFileName(data));
-  pdfDoc.setSubject("Ungating master packet");
-  pdfDoc.setCreator("Ungating Packet Builder");
-  return pdfDoc.save();
+  const formData = new FormData();
+  formData.append(
+    "data",
+    JSON.stringify({
+      marketplace: data.marketplace,
+      asin: data.asin,
+      productDescription: data.productDescription,
+      unitsPurchased: data.unitsPurchased,
+      supplierName: data.supplierName,
+      invoiceNumber: data.invoiceNumber,
+      invoiceDate: data.invoiceDate,
+      buyerName: data.buyerName,
+      billingAddress: data.billingAddress,
+      purchaseNotes: data.purchaseNotes
+    })
+  );
+  packetDocumentOrder.forEach((file) => formData.append("files", file, file.name));
+
+  const endpoint = location.protocol === "file:" ? "http://127.0.0.1:8080/api/generate-master-pdf" : "/api/generate-master-pdf";
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      body: formData
+    });
+  } catch {
+    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
+  }
+
+  if (!response.ok) {
+    let message = "PDF generation failed.";
+    try {
+      const payload = await response.json();
+      message = payload.error || message;
+    } catch {
+      message = await response.text();
+    }
+    throw new Error(message);
+  }
+
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    fileName: getResponseFileName(response, "Ungating_Package")
+  };
 }
 
 async function downloadPacketPdf() {
   const data = buildPacket({ preserveOrder: true });
-  const fileName = getPacketFileName(data);
-  els.downloadStatus.textContent = `Building ${fileName}.pdf...`;
+  els.downloadStatus.textContent = "Building Ungating_Package.pdf...";
 
   try {
-    const bytes = await buildPdfBytes(data);
+    const { bytes, fileName } = await buildMasterPdfWithBackend(data);
     downloadBlob(bytes, fileName);
     els.downloadStatus.textContent = `${fileName}.pdf downloaded.`;
   } catch (error) {

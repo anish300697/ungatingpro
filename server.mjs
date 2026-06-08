@@ -1,12 +1,9 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
-const mammoth = require("mammoth");
-const heicConvert = require("heic-convert");
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import mammoth from "mammoth";
+import heicConvert from "heic-convert";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 8080);
@@ -70,17 +67,34 @@ function parseMultipart(buffer, contentType) {
 
       const headerText = trimmed.slice(0, splitIndex);
       const content = trimmed.slice(splitIndex + 4);
+      const nameMatch = /name="([^"]+)"/i.exec(headerText);
       const filenameMatch = /filename="([^"]+)"/i.exec(headerText);
       const typeMatch = /Content-Type:\s*([^\r\n]+)/i.exec(headerText);
-      if (!filenameMatch) return null;
+      if (!nameMatch) return null;
+
+      if (!filenameMatch) {
+        return {
+          name: nameMatch[1],
+          value: Buffer.from(content, "binary").toString("utf8")
+        };
+      }
 
       return {
+        name: nameMatch[1],
         filename: sanitizeFileName(filenameMatch[1]),
         contentType: typeMatch?.[1] || "application/octet-stream",
         data: Buffer.from(content, "binary")
       };
     })
     .filter(Boolean);
+}
+
+function getMultipartFiles(parts) {
+  return parts.filter((part) => part.filename);
+}
+
+function getMultipartField(parts, name) {
+  return parts.find((part) => part.name === name && !part.filename)?.value || "";
 }
 
 function sanitizeFileName(fileName) {
@@ -166,7 +180,7 @@ async function appendTextDocument(pdfDoc, title, text) {
 async function handleWordConversion(request, response) {
   try {
     const body = await readRequestBody(request);
-    const files = parseMultipart(body, request.headers["content-type"]);
+    const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"]));
     const wordFiles = files.filter((file) => /\.docx$/i.test(file.filename));
     const legacyFiles = files.filter((file) => /\.doc$/i.test(file.filename));
 
@@ -195,6 +209,7 @@ async function handleWordConversion(request, response) {
 
     response.writeHead(200, {
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
       "Content-Length": pdf.length,
       "Content-Disposition": 'attachment; filename="WORD_TO_PDF.pdf"'
@@ -252,7 +267,7 @@ async function appendPhotoPage(pdfDoc, file) {
 async function handlePhotoConversion(request, response) {
   try {
     const body = await readRequestBody(request);
-    const files = parseMultipart(body, request.headers["content-type"]).filter(isSupportedPhoto);
+    const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"])).filter(isSupportedPhoto);
 
     if (!files.length) {
       sendJson(response, 400, { error: "Upload at least one JPG, PNG, or HEIC photo." });
@@ -271,6 +286,7 @@ async function handlePhotoConversion(request, response) {
 
     response.writeHead(200, {
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
       "Content-Length": pdf.length,
       "Content-Disposition": 'attachment; filename="PHOTOS_TO_PDF.pdf"'
@@ -278,6 +294,194 @@ async function handlePhotoConversion(request, response) {
     response.end(pdf);
   } catch (error) {
     sendJson(response, 500, { error: error.message });
+  }
+}
+
+function isSupportedMasterFile(file) {
+  return isPdfFile(file) || isSupportedPhoto(file);
+}
+
+function isPdfFile(file) {
+  return /\.pdf$/i.test(file.filename) || /application\/pdf/i.test(file.contentType);
+}
+
+function buildSopParts(data) {
+  const invoiceLine = data.invoiceNumber
+    ? `The primary invoice referenced for this request is ${data.invoiceNumber}${data.invoiceDate ? `, dated ${data.invoiceDate}` : ""}.`
+    : "The attached invoice is included as the primary purchase record for this request.";
+
+  return {
+    title: "Ungating Approval Request",
+    meta: [
+      `ASIN: ${data.asin || "[ASIN]"}`,
+      `Units: ${data.unitsPurchased || "[unit count]"}`,
+      `Supplier: ${data.supplierName || "[supplier name]"}`,
+      `Invoice: ${data.invoiceNumber || "[invoice number]"}`,
+      `Business Address: ${data.billingAddress || "[business address]"}`
+    ],
+    paragraphs: [
+      "To Amazon Seller Support Team,",
+      `I am requesting approval to sell ASIN ${data.asin || "[ASIN]"}, described as ${data.productDescription || "[product description]"}. I purchased ${data.unitsPurchased || "[unit count]"} units from ${data.supplierName || "[supplier name]"} for resale through my business${data.buyerName ? `, ${data.buyerName}` : ""}.`,
+      `${invoiceLine} I have attached the supporting supplier documentation, delivery evidence, and product photographs so your team can verify the purchase source, quantity, and product identity.`,
+      `The documents in this packet are genuine purchase records and supporting proofs. They are organized to show the connection between the supplier, the purchased inventory, and the ASIN requested for approval.${data.billingAddress ? ` My business address for verification is ${data.billingAddress}.` : ""} ${data.purchaseNotes || "The invoice, shipment evidence, and photographs are intended to make the review straightforward and complete."}`,
+      "Please review the attached packet and approve my account to list this product. I am happy to provide any additional documentation needed for verification.",
+      `Thank you,\n${data.buyerName || "[Your business name]"}`
+    ],
+    footer: "Generated for marketplace ungating submission"
+  };
+}
+
+async function appendSopPage(pdfDoc, data) {
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const sop = buildSopParts(data);
+  const bodySize = 11;
+  const lineHeight = bodySize * 1.4;
+  let page = pdfDoc.addPage([pageSize.width, pageSize.height]);
+  let y = pageSize.height - pageSize.margin;
+
+  function drawFooter(targetPage) {
+    targetPage.drawLine({
+      start: { x: pageSize.margin, y: pageSize.margin - 16 },
+      end: { x: pageSize.width - pageSize.margin, y: pageSize.margin - 16 },
+      thickness: 0.6,
+      color: colors.accent
+    });
+    targetPage.drawText(sop.footer, {
+      x: pageSize.margin,
+      y: pageSize.margin - 30,
+      size: 8,
+      font: regular,
+      color: colors.text
+    });
+  }
+
+  function newPage() {
+    drawFooter(page);
+    page = pdfDoc.addPage([pageSize.width, pageSize.height]);
+    y = pageSize.height - pageSize.margin;
+  }
+
+  page.drawText(sop.title, {
+    x: pageSize.margin,
+    y,
+    size: 24,
+    font: bold,
+    color: colors.header
+  });
+  y -= 28;
+
+  page.drawLine({
+    start: { x: pageSize.margin, y },
+    end: { x: pageSize.width - pageSize.margin, y },
+    thickness: 1.4,
+    color: colors.accent
+  });
+  y -= 24;
+
+  wrapText(sop.meta.join("   |   "), bold, 13, pageSize.width - pageSize.margin * 2).forEach((line) => {
+    page.drawText(line, {
+      x: pageSize.margin,
+      y,
+      size: 13,
+      font: bold,
+      color: colors.accent
+    });
+    y -= 18.2;
+  });
+  y -= 16;
+
+  sop.paragraphs.forEach((paragraph) => {
+    const lines = paragraph
+      .split("\n")
+      .flatMap((line) => wrapText(line, regular, bodySize, pageSize.width - pageSize.margin * 2));
+
+    lines.forEach((line) => {
+      if (y < pageSize.margin + 28) newPage();
+      page.drawText(line, {
+        x: pageSize.margin,
+        y,
+        size: bodySize,
+        font: regular,
+        color: colors.text
+      });
+      y -= lineHeight;
+    });
+    y -= bodySize * 0.85;
+  });
+
+  drawFooter(page);
+}
+
+async function appendPdfFile(pdfDoc, file) {
+  const sourcePdf = await PDFDocument.load(file.data, { ignoreEncryption: true });
+  const copiedPages = await pdfDoc.copyPages(sourcePdf, sourcePdf.getPageIndices());
+  copiedPages.forEach((page) => pdfDoc.addPage(page));
+}
+
+async function appendMasterFile(pdfDoc, file) {
+  if (isPdfFile(file)) {
+    await appendPdfFile(pdfDoc, file);
+    return;
+  }
+
+  if (isSupportedPhoto(file)) {
+    await appendPhotoPage(pdfDoc, file);
+    return;
+  }
+
+  throw new Error(`Unsupported file type: ${file.filename}. Upload PDF, JPG, PNG, HEIC, or HEIF files.`);
+}
+
+async function handleMasterPdfGeneration(request, response) {
+  try {
+    const body = await readRequestBody(request);
+    const parts = parseMultipart(body, request.headers["content-type"]);
+    const files = getMultipartFiles(parts);
+
+    if (!files.length) {
+      sendJson(response, 400, { error: "Upload at least one invoice, delivery slip, order confirmation, or product photo." });
+      return;
+    }
+
+    const unsupported = files.filter((file) => !isSupportedMasterFile(file));
+    if (unsupported.length) {
+      sendJson(response, 400, {
+        error: `Unsupported file type: ${unsupported.map((file) => file.filename).join(", ")}. Upload PDF, JPG, PNG, HEIC, or HEIF files.`
+      });
+      return;
+    }
+
+    let data = {};
+    try {
+      data = JSON.parse(getMultipartField(parts, "data") || "{}");
+    } catch {
+      sendJson(response, 400, { error: "The PDF request data could not be read. Refresh the page and try again." });
+      return;
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    await appendSopPage(pdfDoc, data);
+
+    for (const file of files) {
+      await appendMasterFile(pdfDoc, file);
+    }
+
+    pdfDoc.setTitle("Ungating_Package");
+    pdfDoc.setSubject("Ungating master packet");
+    pdfDoc.setCreator("A2Z UNGATING");
+    const pdf = Buffer.from(await pdfDoc.save());
+
+    response.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "Content-Disposition",
+      "Content-Type": "application/pdf",
+      "Content-Length": pdf.length,
+      "Content-Disposition": 'attachment; filename="Ungating_Package.pdf"'
+    });
+    response.end(pdf);
+  } catch (error) {
+    sendJson(response, 500, { error: `PDF generation failed: ${error.message}` });
   }
 }
 
@@ -308,6 +512,11 @@ createServer(async (request, response) => {
 
   if (request.method === "POST" && url.pathname === "/api/convert/photos") {
     await handlePhotoConversion(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/generate-master-pdf") {
+    await handleMasterPdfGeneration(request, response);
     return;
   }
 
