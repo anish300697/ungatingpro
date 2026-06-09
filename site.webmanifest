@@ -1,0 +1,19 @@
+{
+  "name": "A2Z UNGATING",
+  "short_name": "UngatingPro",
+  "icons": [
+    {
+      "src": "/assets/favicon/ungatingpro-door-180.png?v=20260609a",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/favicon/ungatingpro-door-512.png?v=20260609a",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0F4C81",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}
