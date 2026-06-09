@@ -96,6 +96,7 @@ button.link-button {
 .logo-container {
   display: flex;
   align-items: center;
+  gap: 10px;
   flex: 0 0 auto;
   margin-left: clamp(12px, 1.4vw, 20px);
   border: none;
@@ -105,15 +106,37 @@ button.link-button {
   text-decoration: none;
 }
 
-.logo {
+.logo-mark {
   display: block;
-  width: 228px;
+  width: 44px;
   height: 44px;
-  max-width: min(228px, 48vw);
+  flex: 0 0 auto;
   border: none;
   background: transparent;
   box-shadow: none;
   overflow: visible;
+}
+
+.logo-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #071b3a;
+  font-family: Inter, Montserrat, Arial, sans-serif;
+  font-size: 1.58rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.logo-word {
+  color: #071b3a;
+}
+
+.logo-pro {
+  color: #3dae48;
+  text-shadow: 0 0 0 #1d6e28;
 }
 
 .site-links {
@@ -1395,10 +1418,13 @@ textarea {
     margin-left: 12px;
   }
 
-  .logo {
-    width: 207px;
+  .logo-mark {
+    width: 40px;
     height: 40px;
-    max-width: min(207px, 82vw);
+  }
+
+  .logo-wordmark {
+    font-size: 1.38rem;
   }
 
   .two-col,
@@ -1438,10 +1464,17 @@ textarea {
 }
 
 @media (max-width: 560px) {
-  .logo {
-    width: 186px;
+  .logo-container {
+    gap: 8px;
+  }
+
+  .logo-mark {
+    width: 36px;
     height: 36px;
-    max-width: min(186px, 82vw);
+  }
+
+  .logo-wordmark {
+    font-size: 1.18rem;
   }
 }
 
