@@ -48,6 +48,7 @@ const types = {
   ".js": "text/javascript; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".md": "text/plain; charset=utf-8",
   ".pdf": "application/pdf",
   ".ico": "image/x-icon",
@@ -72,6 +73,25 @@ function sendJsonWithHeaders(response, status, payload, headers = {}) {
     ...headers
   });
   response.end(JSON.stringify(payload));
+}
+
+async function sendFile(response, filePath, headers = {}) {
+  const body = await readFile(filePath);
+  response.writeHead(200, {
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": types[extname(filePath)] || "application/octet-stream",
+    ...headers
+  });
+  response.end(body);
+}
+
+async function sendNoCacheFile(response, relativePath) {
+  const filePath = normalize(join(root, relativePath));
+  await sendFile(response, filePath, {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0"
+  });
 }
 
 function readRequestBody(request) {
@@ -1283,6 +1303,46 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/favicon.ico") {
+    try {
+      await sendNoCacheFile(response, "favicon.ico");
+    } catch {
+      response.writeHead(404);
+      response.end("Not found");
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/favicon-ungatingpro.ico") {
+    try {
+      await sendNoCacheFile(response, "favicon-ungatingpro.ico");
+    } catch {
+      response.writeHead(404);
+      response.end("Not found");
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/favicon.png") {
+    try {
+      await sendNoCacheFile(response, "favicon.png");
+    } catch {
+      response.writeHead(404);
+      response.end("Not found");
+    }
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/favicon-ungatingpro.png") {
+    try {
+      await sendNoCacheFile(response, "favicon-ungatingpro.png");
+    } catch {
+      response.writeHead(404);
+      response.end("Not found");
+    }
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/convert/word") {
     await handleWordConversion(request, response);
     return;
@@ -1361,12 +1421,7 @@ const server = createServer(async (request, response) => {
   }
 
   try {
-    const body = await readFile(filePath);
-    response.writeHead(200, {
-      "Access-Control-Allow-Origin": "*",
-      "Content-Type": types[extname(filePath)] || "application/octet-stream"
-    });
-    response.end(body);
+    await sendFile(response, filePath);
   } catch {
     response.writeHead(404);
     response.end("Not found");

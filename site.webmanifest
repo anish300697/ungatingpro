@@ -3,12 +3,12 @@
   "short_name": "UngatingPro",
   "icons": [
     {
-      "src": "/assets/favicon/ungatingpro-door-180.png?v=20260609a",
+      "src": "/assets/favicon/ungatingpro-door-180.png?v=20260609b",
       "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "/assets/favicon/ungatingpro-door-512.png?v=20260609a",
+      "src": "/assets/favicon/ungatingpro-door-512.png?v=20260609b",
       "sizes": "512x512",
       "type": "image/png"
     }
