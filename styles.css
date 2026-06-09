@@ -100,9 +100,19 @@ button.link-button {
   margin-left: clamp(12px, 1.4vw, 20px);
   border: none;
   padding: 0;
+  color: #071b3a;
   background: transparent;
   box-shadow: none;
-  text-decoration: none;
+  text-decoration: none !important;
+  -webkit-text-decoration: none;
+}
+
+.logo-container:hover,
+.logo-container:focus,
+.logo-container:visited,
+.logo-container:active {
+  color: #071b3a;
+  text-decoration: none !important;
 }
 
 .logo-wordmark {
@@ -115,15 +125,18 @@ button.link-button {
   line-height: 0.95;
   letter-spacing: 0;
   white-space: nowrap;
+  text-decoration: none !important;
 }
 
 .logo-word {
   color: #071b3a;
+  text-decoration: none !important;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .logo-pro {
   color: #45b84e;
+  text-decoration: none !important;
   filter: drop-shadow(0 0 8px rgba(69, 184, 78, 0.22));
 }
 
