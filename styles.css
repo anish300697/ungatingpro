@@ -439,6 +439,28 @@ button.link-button {
   display: none;
 }
 
+.camera-capture {
+  display: none;
+  min-height: 48px;
+  place-items: center;
+  border: 1px solid rgba(20, 108, 95, 0.28);
+  border-radius: 6px;
+  padding: 0 16px;
+  color: white;
+  background: linear-gradient(135deg, #146c5f 0%, #2e75b6 100%);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(20, 108, 95, 0.16);
+}
+
+.camera-capture input {
+  display: none;
+}
+
+.converter-hint {
+  font-size: 0.9rem;
+}
+
 .converter-list {
   display: grid;
   gap: 8px;
@@ -1413,6 +1435,10 @@ textarea {
   .site-links {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .camera-capture {
+    display: grid;
   }
 
   .logo-container {

@@ -147,6 +147,11 @@
               <span>Choose photos</span>
               <input id="photoFiles" type="file" multiple accept=".png,.jpg,.jpeg,.heic,.heif,image/png,image/jpeg,image/heic,image/heif" />
             </label>
+            <label class="camera-capture" for="cameraPhotos">
+              <span>Take Photos</span>
+              <input id="cameraPhotos" type="file" accept="image/*" capture="environment" />
+            </label>
+            <p class="converter-hint">On phones, take one photo at a time. Each shot is added to the PDF list.</p>
             <div id="photoFileList" class="converter-list empty-state">No photos selected yet.</div>
             <button id="convertPhotos" type="button">Convert Photos to PDF</button>
             <p id="photoConvertStatus" class="download-status" aria-live="polite"></p>

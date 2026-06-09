@@ -11,7 +11,8 @@ const fields = {
   purchaseNotes: document.querySelector("#purchaseNotes"),
   proofFiles: document.querySelector("#proofFiles"),
   wordFiles: document.querySelector("#wordFiles"),
-  photoFiles: document.querySelector("#photoFiles")
+  photoFiles: document.querySelector("#photoFiles"),
+  cameraPhotos: document.querySelector("#cameraPhotos")
 };
 
 const uploadZones = {
@@ -740,6 +741,28 @@ function mergeInputFiles(input, droppedFiles) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function timestampFileName(prefix, extension) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "_");
+  return `${prefix}_${stamp}.${extension}`;
+}
+
+function normalizeCameraFile(file) {
+  if (!file) return null;
+  const extension = /png/i.test(file.type) ? "png" : "jpg";
+  return new File([file], timestampFileName("CAMERA_PHOTO", extension), {
+    type: file.type || "image/jpeg",
+    lastModified: Date.now()
+  });
+}
+
+function appendCameraPhoto() {
+  const captured = Array.from(fields.cameraPhotos.files || []).map(normalizeCameraFile).filter(Boolean);
+  if (!captured.length) return;
+  mergeInputFiles(fields.photoFiles, captured);
+  fields.cameraPhotos.value = "";
+  els.photoConvertStatus.textContent = `${captured.length} camera photo added.`;
+}
+
 function setupDropZone(zone, input, acceptTest) {
   if (!zone || !input) return;
 
@@ -1084,6 +1107,7 @@ async function signOut() {
     fields.proofFiles.value = "";
     fields.wordFiles.value = "";
     fields.photoFiles.value = "";
+    fields.cameraPhotos.value = "";
     packetDocumentOrder = [];
     buildPacket();
     updateConverterLists();
@@ -1251,6 +1275,7 @@ els.convertWord.addEventListener("click", convertWordToPdf);
 els.convertPhotos.addEventListener("click", convertPhotosToPdf);
 fields.wordFiles.addEventListener("change", updateConverterLists);
 fields.photoFiles.addEventListener("change", updateConverterLists);
+fields.cameraPhotos.addEventListener("change", appendCameraPhoto);
 els.documentOrderList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
