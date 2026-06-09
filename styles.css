@@ -96,7 +96,6 @@ button.link-button {
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex: 0 0 auto;
   margin-left: clamp(12px, 1.4vw, 20px);
   border: none;
@@ -106,37 +105,26 @@ button.link-button {
   text-decoration: none;
 }
 
-.logo-mark {
-  display: block;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  overflow: visible;
-}
-
 .logo-wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  color: #071b3a;
-  font-family: Inter, Montserrat, Arial, sans-serif;
-  font-size: 1.58rem;
+  gap: 5px;
+  font-family: Montserrat, Inter, Arial, sans-serif;
+  font-size: clamp(1.55rem, 2.3vw, 2.05rem);
   font-weight: 900;
-  line-height: 1;
+  line-height: 0.95;
   letter-spacing: 0;
   white-space: nowrap;
 }
 
 .logo-word {
   color: #071b3a;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .logo-pro {
-  color: #3dae48;
-  text-shadow: 0 0 0 #1d6e28;
+  color: #45b84e;
+  filter: drop-shadow(0 0 8px rgba(69, 184, 78, 0.22));
 }
 
 .site-links {
@@ -1418,13 +1406,8 @@ textarea {
     margin-left: 12px;
   }
 
-  .logo-mark {
-    width: 40px;
-    height: 40px;
-  }
-
   .logo-wordmark {
-    font-size: 1.38rem;
+    font-size: 1.45rem;
   }
 
   .two-col,
@@ -1464,17 +1447,8 @@ textarea {
 }
 
 @media (max-width: 560px) {
-  .logo-container {
-    gap: 8px;
-  }
-
-  .logo-mark {
-    width: 36px;
-    height: 36px;
-  }
-
   .logo-wordmark {
-    font-size: 1.18rem;
+    font-size: 1.28rem;
   }
 }
 
