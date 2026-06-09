@@ -36,9 +36,9 @@
       <section id="landingPage" class="page landing-page" aria-label="Ungating Pro landing page">
         <header class="landing-hero">
           <div class="landing-copy">
-            <p class="eyebrow">Seller Approval Automation</p>
-            <h1>The Ultimate Ungating</h1>
-            <p>Build polished approval packets from supplier invoices, purchase proofs, and product photographs without wrestling with document order, formatting, or PDF assembly.</p>
+            <p class="eyebrow">AI-Powered Amazon Seller Approval Automation</p>
+            <h1>Ultimate AI Ungating</h1>
+            <p>Ungating Pro uses AI to organize supplier invoices, receipts, delivery slips, product photos, and purchase proofs into a polished Amazon-ready packet. It helps sellers prepare stronger documentation and AI-drafted support letters for brand, category, and sub-category ungating requests.</p>
             <div class="landing-actions">
               <button id="startBuilder" type="button">Open Ungate Builder</button>
               <a id="viewSubscription" href="/subscription">View Subscription</a>
@@ -76,21 +76,36 @@
           </div>
         </header>
 
+        <section class="ai-value-strip" aria-label="AI ungating workflow highlights">
+          <div>
+            <strong>AI reviews your proof stack</strong>
+            <span>Invoices, supplier receipts, delivery slips, product photos, and purchase evidence.</span>
+          </div>
+          <div>
+            <strong>AI builds the request narrative</strong>
+            <span>Creates a formal Seller Support letter aligned with your ASIN and supplier details.</span>
+          </div>
+          <div>
+            <strong>AI organizes the final packet</strong>
+            <span>Places documents in a clean order for brand, category, and sub-category ungating.</span>
+          </div>
+        </section>
+
         <section class="business-panels" aria-label="Ungating Pro features">
           <article>
             <span>01</span>
-            <h2>Document Assembly</h2>
-            <p>Place SOP, invoices, photos, and supplier proofs into one approval-ready PDF.</p>
+            <h2>Document Intelligence</h2>
+            <p>AI helps structure invoices, receipts, delivery slips, photos, and supplier proofs into one clean approval packet.</p>
           </article>
           <article>
             <span>02</span>
-            <h2>Seller Details</h2>
-            <p>Capture ASIN, business identity, supplier, invoice, and address information in one clean flow.</p>
+            <h2>SOP Letter Drafting</h2>
+            <p>Generate a professional Amazon Seller Support request using ASIN, brand, category, supplier, invoice, and business details.</p>
           </article>
           <article>
             <span>03</span>
-            <h2>Packet Review</h2>
-            <p>Verify the generated master packet before saving the final ASIN-named PDF.</p>
+            <h2>Brand & Category Ready</h2>
+            <p>Prepare documentation for Amazon brand approvals, restricted categories, gated sub-categories, and product-level reviews.</p>
           </article>
         </section>
 
@@ -287,7 +302,7 @@
             </label>
             <label>
               Password
-              <input id="createPassword" type="password" autocomplete="new-password" minlength="8" required />
+              <input id="createPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,128}" title="Use 10+ characters with uppercase, lowercase, number, and special character." required />
             </label>
             <button type="submit">Create Account</button>
             <p id="createAccountStatus" class="download-status" aria-live="polite"></p>
@@ -302,6 +317,68 @@
               <p id="accountEmail"></p>
             </div>
             <button id="signOutButton" type="button" class="secondary">Sign Out</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="dashboardPage" class="page auth-page is-hidden" aria-label="Dashboard">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Seller Workspace</p>
+            <h1>Dashboard</h1>
+            <p>Review your account access and continue building ungating packets.</p>
+          </div>
+        </header>
+
+        <section class="account-panel">
+          <div class="account-summary">
+            <div>
+              <p class="eyebrow">Account Status</p>
+              <h2 id="dashboardName">Account</h2>
+              <p id="dashboardAccess">Subscription status will appear here.</p>
+            </div>
+            <div class="dashboard-actions">
+              <button id="dashboardAdmin" type="button" class="secondary is-hidden">Admin Dashboard</button>
+              <button id="dashboardBuilder" type="button">Open Ungate Builder</button>
+              <button id="dashboardSignOut" type="button" class="secondary">Sign Out</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="adminPage" class="page auth-page is-hidden" aria-label="Admin dashboard">
+        <header class="auth-hero">
+          <div>
+            <p class="eyebrow">Admin Control</p>
+            <h1>Admin Dashboard</h1>
+            <p>Manage users, subscription access, plans, coupons, and packet activity.</p>
+          </div>
+        </header>
+
+        <section class="admin-panel">
+          <div class="admin-heading">
+            <div>
+              <h2>User Access</h2>
+              <p id="adminStatus" class="download-status" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Subscription</th>
+                  <th>Plan</th>
+                  <th>Coupon</th>
+                  <th>Created</th>
+                  <th>Packages</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsers">
+                <tr><td colspan="7">Loading users...</td></tr>
+              </tbody>
+            </table>
           </div>
         </section>
       </section>
@@ -342,11 +419,11 @@
             <h2>Choose New Password</h2>
             <label>
               New password
-              <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+              <input id="newPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,128}" title="Use 10+ characters with uppercase, lowercase, number, and special character." required />
             </label>
             <label>
               Confirm password
-              <input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+              <input id="confirmPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,128}" title="Use 10+ characters with uppercase, lowercase, number, and special character." required />
             </label>
             <button type="submit">Update Password</button>
             <p id="resetPasswordStatus" class="download-status" aria-live="polite"></p>

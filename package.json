@@ -12,7 +12,8 @@
     "mammoth": "^1.8.0",
     "mysql2": "latest",
     "nodemailer": "latest",
-    "pdf-lib": "latest"
+    "pdf-lib": "latest",
+    "stripe": "latest"
   },
   "engines": {
     "node": ">=18"

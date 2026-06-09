@@ -7,6 +7,7 @@ import mammoth from "mammoth";
 import heicConvert from "heic-convert";
 import mysql from "mysql2/promise";
 import nodemailer from "nodemailer";
+import Stripe from "stripe";
 
 const root = process.cwd();
 const port = Number(process.env.PORT || 8080);
@@ -16,6 +17,16 @@ const sessionDays = 14;
 const resetTokenMinutes = 30;
 const resetRequestLimit = 5;
 const resetRateWindowMs = 15 * 60 * 1000;
+const jsonBodyLimit = 64 * 1024;
+const uploadBodyLimit = 60 * 1024 * 1024;
+const defaultBodyLimit = 2 * 1024 * 1024;
+const maxUploadFiles = 30;
+const maxSingleFileBytes = 20 * 1024 * 1024;
+const authRateLimit = 8;
+const accountRateLimit = 5;
+const apiRateLimit = 120;
+const authRateWindowMs = 15 * 60 * 1000;
+const apiRateWindowMs = 60 * 1000;
 const coupons = {
   LAUNCH10: { type: "percent", amount: 10 },
   BETA25: { type: "percent", amount: 25 },
@@ -28,7 +39,9 @@ const plans = {
 
 let dbPool = null;
 let dbReady = false;
+let stripeClient = null;
 const resetRequestBuckets = new Map();
+const rateLimitBuckets = new Map();
 
 const pageSize = {
   width: 612,
@@ -58,8 +71,19 @@ const types = {
   ".jpeg": "image/jpeg"
 };
 
+const securityHeaders = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "X-XSS-Protection": "0",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+};
+
 function sendJson(response, status, payload) {
   response.writeHead(status, {
+    ...securityHeaders,
     "Access-Control-Allow-Origin": "*",
     "Content-Type": "application/json; charset=utf-8"
   });
@@ -68,6 +92,7 @@ function sendJson(response, status, payload) {
 
 function sendJsonWithHeaders(response, status, payload, headers = {}) {
   response.writeHead(status, {
+    ...securityHeaders,
     "Access-Control-Allow-Origin": "*",
     "Content-Type": "application/json; charset=utf-8",
     ...headers
@@ -78,6 +103,7 @@ function sendJsonWithHeaders(response, status, payload, headers = {}) {
 async function sendFile(response, filePath, headers = {}) {
   const body = await readFile(filePath);
   response.writeHead(200, {
+    ...securityHeaders,
     "Access-Control-Allow-Origin": "*",
     "Content-Type": types[extname(filePath)] || "application/octet-stream",
     ...headers
@@ -94,17 +120,26 @@ async function sendNoCacheFile(response, relativePath) {
   });
 }
 
-function readRequestBody(request) {
+function readRequestBody(request, maxBytes = defaultBodyLimit) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    request.on("data", (chunk) => chunks.push(chunk));
+    let total = 0;
+    request.on("data", (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        reject(Object.assign(new Error("Request body is too large."), { statusCode: 413 }));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
     request.on("end", () => resolve(Buffer.concat(chunks)));
     request.on("error", reject);
   });
 }
 
 async function readJsonBody(request) {
-  const body = await readRequestBody(request);
+  const body = await readRequestBody(request, jsonBodyLimit);
   if (!body.length) return {};
   return JSON.parse(body.toString("utf8"));
 }
@@ -153,6 +188,8 @@ async function initDatabase() {
       payment_status VARCHAR(32) NULL,
       coupon_code VARCHAR(64) NULL,
       access_source VARCHAR(32) NULL,
+      stripe_customer_id VARCHAR(191) NULL,
+      stripe_subscription_id VARCHAR(191) NULL,
       has_full_access TINYINT(1) NOT NULL DEFAULT 0,
       access_expires_at DATETIME NULL,
       subscription_started_at DATETIME NULL,
@@ -195,6 +232,20 @@ async function initDatabase() {
       discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
       final_amount DECIMAL(10,2) NOT NULL,
       payment_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      stripe_checkout_session_id VARCHAR(191) NULL,
+      stripe_customer_id VARCHAR(191) NULL,
+      stripe_subscription_id VARCHAR(191) NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await ensurePaymentStripeColumns();
+
+  await dbPool.execute(`
+    CREATE TABLE IF NOT EXISTS packages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      file_count INT NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -204,14 +255,43 @@ async function initDatabase() {
   dbReady = true;
 }
 
+async function ensurePaymentStripeColumns() {
+  const columns = [
+    ["stripe_checkout_session_id", "VARCHAR(191) NULL"],
+    ["stripe_customer_id", "VARCHAR(191) NULL"],
+    ["stripe_subscription_id", "VARCHAR(191) NULL"]
+  ];
+
+  for (const [column, definition] of columns) {
+    const [rows] = await dbPool.execute(
+      `
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'payments'
+          AND COLUMN_NAME = :column
+      `,
+      { column }
+    );
+    if (!rows.length) {
+      await dbPool.execute(`ALTER TABLE payments ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
 async function ensureUserSubscriptionColumns() {
   const columns = [
+    ["role", "VARCHAR(32) NOT NULL DEFAULT 'user'"],
+    ["status", "VARCHAR(32) NOT NULL DEFAULT 'active'"],
+    ["is_master", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["subscription_status", "VARCHAR(32) NOT NULL DEFAULT 'inactive'"],
     ["plan", "VARCHAR(32) NULL"],
     ["plan_type", "VARCHAR(32) NULL"],
     ["payment_status", "VARCHAR(32) NULL"],
     ["coupon_code", "VARCHAR(64) NULL"],
     ["access_source", "VARCHAR(32) NULL"],
+    ["stripe_customer_id", "VARCHAR(191) NULL"],
+    ["stripe_subscription_id", "VARCHAR(191) NULL"],
     ["has_full_access", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["access_expires_at", "DATETIME NULL"],
     ["subscription_started_at", "DATETIME NULL"],
@@ -258,6 +338,24 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(String(email || "")) && String(email || "").length <= 191;
+}
+
+function validatePassword(password) {
+  if (password.length < 10) return "Password must be at least 10 characters.";
+  if (password.length > 128) return "Password must be 128 characters or fewer.";
+  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter.";
+  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter.";
+  if (!/\d/.test(password)) return "Password must include a number.";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Password must include a special character.";
+  return "";
+}
+
+function isValidName(name) {
+  return /^[A-Za-z0-9 .,'-]{2,160}$/.test(String(name || ""));
+}
+
 function publicUser(user) {
   if (!user) return null;
   return {
@@ -273,6 +371,8 @@ function publicUser(user) {
     paymentStatus: user.payment_status || null,
     couponCode: user.coupon_code || null,
     accessSource: user.access_source || null,
+    stripeCustomerId: user.stripe_customer_id || null,
+    stripeSubscriptionId: user.stripe_subscription_id || null,
     hasFullAccess: Boolean(user.has_full_access),
     subscriptionStartedAt: user.subscription_started_at || null,
     subscriptionExpiresAt: user.subscription_expires_at || user.access_expires_at || null,
@@ -305,6 +405,37 @@ function getClientIp(request) {
     .split(",")[0]
     .trim();
 }
+
+function checkRateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+
+  if (bucket.count >= limit) return false;
+  bucket.count += 1;
+  return true;
+}
+
+function enforceRateLimit(request, response, scope, limit, windowMs) {
+  const key = `${scope}:${getClientIp(request)}`;
+  if (checkRateLimit(key, limit, windowMs)) return true;
+  sendJson(response, 429, { error: "Too many requests. Please wait and try again." });
+  return false;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitBuckets.entries()) {
+    if (bucket.resetAt <= now) rateLimitBuckets.delete(key);
+  }
+  for (const [key, bucket] of resetRequestBuckets.entries()) {
+    if (bucket.resetAt <= now) resetRequestBuckets.delete(key);
+  }
+}, 10 * 60 * 1000).unref?.();
 
 function checkResetRateLimit(request, email) {
   const now = Date.now();
@@ -466,6 +597,7 @@ async function requireActiveAccess(request, response) {
 
 async function handleCreateAccount(request, response) {
   if (!requireDatabase(response)) return;
+  if (!enforceRateLimit(request, response, "create-account", accountRateLimit, authRateWindowMs)) return;
 
   try {
     const payload = await readJsonBody(request);
@@ -478,8 +610,19 @@ async function handleCreateAccount(request, response) {
       return;
     }
 
-    if (password.length < 8) {
-      sendJson(response, 400, { error: "Password must be at least 8 characters." });
+    if (!isValidName(name)) {
+      sendJson(response, 400, { error: "Name can contain letters, numbers, spaces, apostrophes, commas, periods, and hyphens." });
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      sendJson(response, 400, { error: "Enter a valid email address." });
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      sendJson(response, 400, { error: passwordError });
       return;
     }
 
@@ -497,17 +640,25 @@ async function handleCreateAccount(request, response) {
       sendJson(response, 409, { error: "An account already exists with this email." });
       return;
     }
-    sendJson(response, 500, { error: `Could not create account: ${error.message}` });
+    console.error(`Create account failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not create account. Please try again later." });
   }
 }
 
 async function handleSignIn(request, response) {
   if (!requireDatabase(response)) return;
+  if (!enforceRateLimit(request, response, "sign-in", authRateLimit, authRateWindowMs)) return;
 
   try {
     const payload = await readJsonBody(request);
     const email = normalizeEmail(payload.email);
     const password = String(payload.password || "");
+
+    if (!isValidEmail(email) || !password || password.length > 128) {
+      sendJson(response, 401, { error: "Invalid email or password." });
+      return;
+    }
+
     const [rows] = await dbPool.execute("SELECT * FROM users WHERE email = :email LIMIT 1", { email });
     const user = rows[0];
 
@@ -524,7 +675,8 @@ async function handleSignIn(request, response) {
     const token = await createSession(user.id);
     sendJsonWithHeaders(response, 200, { user: publicUser(user) }, { "Set-Cookie": getCookieHeader(request, token) });
   } catch (error) {
-    sendJson(response, 500, { error: `Could not sign in: ${error.message}` });
+    console.error(`Sign in failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not sign in. Please try again later." });
   }
 }
 
@@ -546,6 +698,11 @@ async function handlePasswordResetRequest(request, response) {
 
     if (!email) {
       sendJson(response, 400, { error: "Email address is required." });
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      sendJson(response, 200, { message: neutralMessage });
       return;
     }
 
@@ -602,8 +759,9 @@ async function handlePasswordReset(request, response) {
       return;
     }
 
-    if (password.length < 8) {
-      sendJson(response, 400, { error: "Password must be at least 8 characters." });
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      sendJson(response, 400, { error: passwordError });
       return;
     }
 
@@ -656,13 +814,43 @@ async function handleAdminUsers(request, response) {
 
   const [rows] = await dbPool.execute(
     `
-      SELECT id, name, email, role, status, is_master, created_at
-      FROM users
-      WHERE is_master = 0
-      ORDER BY created_at DESC
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.role,
+        u.status,
+        u.is_master,
+        u.subscription_status,
+        u.plan,
+        u.plan_type,
+        u.payment_status,
+        u.coupon_code,
+        u.access_source,
+        u.has_full_access,
+        u.stripe_customer_id,
+        u.stripe_subscription_id,
+        u.subscription_started_at,
+        u.subscription_expires_at,
+        u.created_at,
+        COALESCE(pc.package_count, 0) AS package_count
+      FROM users u
+      LEFT JOIN (
+        SELECT user_id, COUNT(*) AS package_count
+        FROM packages
+        GROUP BY user_id
+      ) pc ON pc.user_id = u.id
+      WHERE u.is_master = 0
+      ORDER BY u.created_at DESC
     `
   );
-  sendJson(response, 200, { users: rows.map(publicUser) });
+  sendJson(response, 200, {
+    users: rows.map((row) => ({
+      ...publicUser(row),
+      createdAt: row.created_at || null,
+      packageCount: Number(row.package_count || 0)
+    }))
+  });
 }
 
 async function handleAdminUserUpdate(request, response) {
@@ -673,18 +861,151 @@ async function handleAdminUserUpdate(request, response) {
   try {
     const payload = await readJsonBody(request);
     const userId = Number(payload.userId);
-    const status = payload.status === "disabled" ? "disabled" : "active";
+    const subscriptionStatus = payload.subscriptionStatus === "active" ? "active" : "inactive";
+    const planType = plans[payload.planType] || payload.planType === "free_all" ? payload.planType : null;
 
     if (!userId) {
       sendJson(response, 400, { error: "User ID is required." });
       return;
     }
 
-    await dbPool.execute("UPDATE users SET status = :status WHERE id = :userId AND is_master = 0", { status, userId });
+    await dbPool.execute(
+      `
+        UPDATE users
+        SET subscription_status = :subscriptionStatus,
+            plan = :planType,
+            plan_type = :planType,
+            payment_status = CASE WHEN :subscriptionStatus = 'active' THEN 'manual' ELSE 'inactive' END,
+            access_source = CASE WHEN :subscriptionStatus = 'active' THEN 'admin' ELSE NULL END,
+            has_full_access = :hasFullAccess,
+            subscription_started_at = CASE WHEN :subscriptionStatus = 'active' THEN COALESCE(subscription_started_at, NOW()) ELSE subscription_started_at END,
+            subscription_expires_at = CASE WHEN :subscriptionStatus = 'active' THEN NULL ELSE NOW() END
+        WHERE id = :userId AND is_master = 0
+      `,
+      { subscriptionStatus, planType, hasFullAccess: subscriptionStatus === "active" ? 1 : 0, userId }
+    );
     sendJson(response, 200, { ok: true });
   } catch (error) {
-    sendJson(response, 500, { error: `Could not update user: ${error.message}` });
+    console.error(`Admin user update failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not update user." });
   }
+}
+
+function getStripeClient() {
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  if (!stripeClient) stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY);
+  return stripeClient;
+}
+
+function getStripePriceConfig(planType) {
+  if (planType === "monthly" && process.env.STRIPE_MONTHLY_PRICE_ID) {
+    return { price: process.env.STRIPE_MONTHLY_PRICE_ID, quantity: 1 };
+  }
+  if (planType === "yearly" && process.env.STRIPE_YEARLY_PRICE_ID) {
+    return { price: process.env.STRIPE_YEARLY_PRICE_ID, quantity: 1 };
+  }
+
+  const plan = plans[planType];
+  if (!plan) return null;
+  return {
+    price_data: {
+      currency: process.env.STRIPE_CURRENCY || "usd",
+      product_data: { name: `${plan.planName} - ${plan.billingCycle}` },
+      unit_amount: Math.round(plan.planPrice * 100),
+      recurring: { interval: planType === "yearly" ? "year" : "month" }
+    },
+    quantity: 1
+  };
+}
+
+function getStripeCouponId(couponCode) {
+  const code = String(couponCode || "").trim().toUpperCase();
+  if (!code) return null;
+  return process.env[`STRIPE_COUPON_${code}`] || null;
+}
+
+function getStripeId(value) {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  return value.id || null;
+}
+
+async function getCheckoutDiscount(stripe, couponCode) {
+  const code = String(couponCode || "").trim().toUpperCase();
+  if (!code) return null;
+
+  const configuredCouponId = getStripeCouponId(code);
+  if (configuredCouponId) return { coupon: configuredCouponId };
+
+  const coupon = coupons[code];
+  if (!coupon) return null;
+
+  const couponPayload = {
+    name: `Ungating Pro ${code}`,
+    duration: "once",
+    metadata: { code }
+  };
+
+  if (coupon.type === "percent") {
+    couponPayload.percent_off = coupon.amount;
+  } else if (coupon.type === "fixed") {
+    couponPayload.amount_off = Math.round(coupon.amount * 100);
+    couponPayload.currency = process.env.STRIPE_CURRENCY || "usd";
+  }
+
+  const stripeCoupon = await stripe.coupons.create(couponPayload);
+  return { coupon: stripeCoupon.id };
+}
+
+async function updateUserSubscription(userId, fields) {
+  await dbPool.execute(
+    `
+      UPDATE users
+      SET subscription_status = :subscriptionStatus,
+          plan = :planType,
+          plan_type = :planType,
+          payment_status = :paymentStatus,
+          access_source = :accessSource,
+          has_full_access = :hasFullAccess,
+          stripe_customer_id = COALESCE(:stripeCustomerId, stripe_customer_id),
+          stripe_subscription_id = COALESCE(:stripeSubscriptionId, stripe_subscription_id),
+          subscription_started_at = CASE WHEN :subscriptionStatus = 'active' THEN COALESCE(subscription_started_at, NOW()) ELSE subscription_started_at END,
+          subscription_expires_at = :subscriptionExpiresAt
+      WHERE id = :userId
+    `,
+    {
+      userId,
+      subscriptionStatus: fields.subscriptionStatus,
+      planType: fields.planType || null,
+      paymentStatus: fields.paymentStatus || null,
+      accessSource: fields.accessSource || null,
+      hasFullAccess: fields.hasFullAccess ? 1 : 0,
+      stripeCustomerId: fields.stripeCustomerId || null,
+      stripeSubscriptionId: fields.stripeSubscriptionId || null,
+      subscriptionExpiresAt: fields.subscriptionExpiresAt || null
+    }
+  );
+}
+
+async function updateSubscriptionByStripeSubscription(stripeSubscriptionId, status, paymentStatus = null) {
+  if (!stripeSubscriptionId) return;
+  const active = status === "active" || status === "trialing";
+  await dbPool.execute(
+    `
+      UPDATE users
+      SET subscription_status = :subscriptionStatus,
+          payment_status = :paymentStatus,
+          has_full_access = :hasFullAccess,
+          subscription_expires_at = CASE WHEN :subscriptionStatus = 'active' THEN NULL ELSE NOW() END
+      WHERE stripe_subscription_id = :stripeSubscriptionId
+    `,
+    {
+      stripeSubscriptionId,
+      subscriptionStatus: active ? "active" : "inactive",
+      paymentStatus: paymentStatus || status || "inactive",
+      hasFullAccess: active ? 1 : 0
+    }
+  );
 }
 
 function roundMoney(value) {
@@ -748,28 +1069,192 @@ async function handleCreateCheckout(request, response) {
       return;
     }
 
+    const stripe = getStripeClient();
+    if (!stripe) {
+      sendJson(response, 503, { error: "Stripe is not configured. Add STRIPE_SECRET_KEY and try again." });
+      return;
+    }
+
+    const priceConfig = getStripePriceConfig(total.planType);
+    if (!priceConfig) {
+      sendJson(response, 400, { error: "Invalid plan selected." });
+      return;
+    }
+
+    const checkoutDiscount = await getCheckoutDiscount(stripe, total.couponCode);
+
+    const baseUrl = getPublicBaseUrl(request);
+    const sessionPayload = {
+      mode: "subscription",
+      line_items: [priceConfig],
+      success_url: `${baseUrl}/dashboard?checkout=success`,
+      cancel_url: `${baseUrl}/subscription?checkout=cancel`,
+      client_reference_id: String(user.id),
+      metadata: {
+        userId: String(user.id),
+        planType: total.planType,
+        couponCode: total.couponCode || ""
+      },
+      subscription_data: {
+        metadata: {
+          userId: String(user.id),
+          planType: total.planType,
+          couponCode: total.couponCode || ""
+        }
+      }
+    };
+
+    if (user.stripe_customer_id) {
+      sessionPayload.customer = user.stripe_customer_id;
+    } else {
+      sessionPayload.customer_email = user.email;
+    }
+
+    if (checkoutDiscount) {
+      sessionPayload.discounts = [checkoutDiscount];
+    }
+
+    const checkoutSession = await stripe.checkout.sessions.create(sessionPayload);
+
     const [result] = await dbPool.execute(
       `
-        INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
-        VALUES (:userId, :planType, :couponCode, :discountAmount, :finalAmount, 'pending')
+        INSERT INTO payments (
+          user_id,
+          plan_type,
+          coupon_code,
+          discount_amount,
+          final_amount,
+          payment_status,
+          stripe_checkout_session_id,
+          stripe_customer_id,
+          stripe_subscription_id
+        )
+        VALUES (
+          :userId,
+          :planType,
+          :couponCode,
+          :discountAmount,
+          :finalAmount,
+          'pending',
+          :stripeCheckoutSessionId,
+          :stripeCustomerId,
+          :stripeSubscriptionId
+        )
       `,
       {
         userId: user.id,
         planType: total.planType,
         couponCode: total.couponCode,
         discountAmount: total.discountAmount,
-        finalAmount: total.finalAmount
+        finalAmount: total.finalAmount,
+        stripeCheckoutSessionId: checkoutSession.id,
+        stripeCustomerId: getStripeId(checkoutSession.customer),
+        stripeSubscriptionId: getStripeId(checkoutSession.subscription)
       }
     );
 
+    if (getStripeId(checkoutSession.customer)) {
+      await dbPool.execute("UPDATE users SET stripe_customer_id = :customerId WHERE id = :userId", {
+        customerId: getStripeId(checkoutSession.customer),
+        userId: user.id
+      });
+    }
+
     sendJson(response, 200, {
       paymentId: result.insertId,
-      stripePending: true,
-      message: "Stripe integration pending. Payment has not been processed yet.",
+      checkoutUrl: checkoutSession.url,
       total
     });
   } catch (error) {
+    console.error(`Stripe checkout failed: ${error.message}`);
     sendJson(response, 500, { error: "Could not start payment." });
+  }
+}
+
+async function handleStripeWebhook(request, response) {
+  if (!requireDatabase(response)) return;
+
+  const stripe = getStripeClient();
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    sendJson(response, 503, { error: "Stripe webhook is not configured." });
+    return;
+  }
+
+  let event;
+  try {
+    const body = await readRequestBody(request, defaultBodyLimit);
+    const signature = request.headers["stripe-signature"];
+    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (error) {
+    console.error(`Stripe webhook verification failed: ${error.message}`);
+    sendJson(response, 400, { error: "Invalid Stripe webhook signature." });
+    return;
+  }
+
+  try {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const userId = Number(session.metadata?.userId || session.client_reference_id);
+      const planType = session.metadata?.planType && plans[session.metadata.planType] ? session.metadata.planType : "monthly";
+      const couponCode = session.metadata?.couponCode || null;
+
+      if (userId) {
+        await updateUserSubscription(userId, {
+          subscriptionStatus: "active",
+          planType,
+          paymentStatus: "paid",
+          accessSource: "stripe",
+          hasFullAccess: true,
+          stripeCustomerId: getStripeId(session.customer),
+          stripeSubscriptionId: getStripeId(session.subscription),
+          subscriptionExpiresAt: null
+        });
+
+        await dbPool.execute(
+          `
+            UPDATE users
+            SET coupon_code = COALESCE(:couponCode, coupon_code)
+            WHERE id = :userId
+          `,
+          { userId, couponCode }
+        );
+
+        await dbPool.execute(
+          `
+            UPDATE payments
+            SET payment_status = 'paid',
+                stripe_customer_id = COALESCE(:stripeCustomerId, stripe_customer_id),
+                stripe_subscription_id = COALESCE(:stripeSubscriptionId, stripe_subscription_id)
+            WHERE stripe_checkout_session_id = :sessionId
+          `,
+          {
+            sessionId: session.id,
+            stripeCustomerId: getStripeId(session.customer),
+            stripeSubscriptionId: getStripeId(session.subscription)
+          }
+        );
+      }
+    }
+
+    if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object;
+      await updateSubscriptionByStripeSubscription(subscription.id, subscription.status, subscription.status);
+    }
+
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+      await updateSubscriptionByStripeSubscription(getStripeId(invoice.subscription), "inactive", "payment_failed");
+    }
+
+    if (event.type === "invoice.paid") {
+      const invoice = event.data.object;
+      await updateSubscriptionByStripeSubscription(getStripeId(invoice.subscription), "active", "paid");
+    }
+
+    sendJson(response, 200, { received: true });
+  } catch (error) {
+    console.error(`Stripe webhook handling failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not process Stripe webhook." });
   }
 }
 
@@ -871,6 +1356,20 @@ function getMultipartFiles(parts) {
   return parts.filter((part) => part.filename);
 }
 
+function validateUploadFiles(files) {
+  if (files.length > maxUploadFiles) {
+    return `Upload ${maxUploadFiles} files or fewer at a time.`;
+  }
+
+  const empty = files.find((file) => !file.data?.length);
+  if (empty) return `File ${empty.filename} is empty.`;
+
+  const oversized = files.find((file) => file.data.length > maxSingleFileBytes);
+  if (oversized) return `File ${oversized.filename} is too large. Upload files smaller than 20 MB each.`;
+
+  return "";
+}
+
 function getMultipartField(parts, name) {
   return parts.find((part) => part.name === name && !part.filename)?.value || "";
 }
@@ -957,8 +1456,13 @@ async function appendTextDocument(pdfDoc, title, text) {
 
 async function handleWordConversion(request, response) {
   try {
-    const body = await readRequestBody(request);
+    const body = await readRequestBody(request, uploadBodyLimit);
     const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"]));
+    const uploadError = validateUploadFiles(files);
+    if (uploadError) {
+      sendJson(response, 400, { error: uploadError });
+      return;
+    }
     const wordFiles = files.filter((file) => /\.docx$/i.test(file.filename));
     const legacyFiles = files.filter((file) => /\.doc$/i.test(file.filename));
 
@@ -985,7 +1489,13 @@ async function handleWordConversion(request, response) {
     pdfDoc.setCreator("Ungating Pro Convert");
     const pdf = Buffer.from(await pdfDoc.save());
 
+    await dbPool.execute("INSERT INTO packages (user_id, file_count) VALUES (:userId, :fileCount)", {
+      userId: user.id,
+      fileCount: files.length
+    });
+
     response.writeHead(200, {
+      ...securityHeaders,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
@@ -994,7 +1504,9 @@ async function handleWordConversion(request, response) {
     });
     response.end(pdf);
   } catch (error) {
-    sendJson(response, 500, { error: error.message });
+    sendJson(response, error.statusCode || 500, {
+      error: error.statusCode === 413 ? "Upload is too large." : "Could not convert Word files."
+    });
   }
 }
 
@@ -1044,8 +1556,14 @@ async function appendPhotoPage(pdfDoc, file) {
 
 async function handlePhotoConversion(request, response) {
   try {
-    const body = await readRequestBody(request);
-    const files = getMultipartFiles(parseMultipart(body, request.headers["content-type"])).filter(isSupportedPhoto);
+    const body = await readRequestBody(request, uploadBodyLimit);
+    const allFiles = getMultipartFiles(parseMultipart(body, request.headers["content-type"]));
+    const uploadError = validateUploadFiles(allFiles);
+    if (uploadError) {
+      sendJson(response, 400, { error: uploadError });
+      return;
+    }
+    const files = allFiles.filter(isSupportedPhoto);
 
     if (!files.length) {
       sendJson(response, 400, { error: "Upload at least one JPG, PNG, or HEIC photo." });
@@ -1063,6 +1581,7 @@ async function handlePhotoConversion(request, response) {
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
+      ...securityHeaders,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
@@ -1071,7 +1590,9 @@ async function handlePhotoConversion(request, response) {
     });
     response.end(pdf);
   } catch (error) {
-    sendJson(response, 500, { error: error.message });
+    sendJson(response, error.statusCode || 500, {
+      error: error.statusCode === 413 ? "Upload is too large." : "Photo conversion failed. Please try smaller or supported images."
+    });
   }
 }
 
@@ -1216,9 +1737,14 @@ async function handleMasterPdfGeneration(request, response) {
   if (!user) return;
 
   try {
-    const body = await readRequestBody(request);
+    const body = await readRequestBody(request, uploadBodyLimit);
     const parts = parseMultipart(body, request.headers["content-type"]);
     const files = getMultipartFiles(parts);
+    const uploadError = validateUploadFiles(files);
+    if (uploadError) {
+      sendJson(response, 400, { error: uploadError });
+      return;
+    }
 
     if (!files.length) {
       sendJson(response, 400, { error: "Upload at least one invoice, delivery slip, order confirmation, or product photo." });
@@ -1254,6 +1780,7 @@ async function handleMasterPdfGeneration(request, response) {
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
+      ...securityHeaders,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
@@ -1262,7 +1789,9 @@ async function handleMasterPdfGeneration(request, response) {
     });
     response.end(pdf);
   } catch (error) {
-    sendJson(response, 500, { error: `PDF generation failed: ${error.message}` });
+    sendJson(response, error.statusCode || 500, {
+      error: error.statusCode === 413 ? "Upload is too large." : "PDF generation failed. Please try again."
+    });
   }
 }
 
@@ -1295,11 +1824,30 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
+      ...securityHeaders,
       "Access-Control-Allow-Headers": "Content-Type",
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Origin": "*"
     });
     response.end();
+    return;
+  }
+
+  if (!["GET", "POST"].includes(request.method || "")) {
+    response.writeHead(405, {
+      ...securityHeaders,
+      "Allow": "GET, POST, OPTIONS"
+    });
+    response.end("Method not allowed");
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/stripe/webhook") {
+    await handleStripeWebhook(request, response);
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/") && !enforceRateLimit(request, response, "api", apiRateLimit, apiRateWindowMs)) {
     return;
   }
 
@@ -1415,7 +1963,7 @@ const server = createServer(async (request, response) => {
 
   const filePath = getSafeStaticPath(url.pathname);
   if (!filePath) {
-    response.writeHead(403);
+    response.writeHead(403, securityHeaders);
     response.end("Forbidden");
     return;
   }
@@ -1423,7 +1971,7 @@ const server = createServer(async (request, response) => {
   try {
     await sendFile(response, filePath);
   } catch {
-    response.writeHead(404);
+    response.writeHead(404, securityHeaders);
     response.end("Not found");
   }
 });

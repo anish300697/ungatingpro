@@ -274,6 +274,37 @@ button.link-button {
   height: auto;
 }
 
+.ai-value-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  width: min(1240px, 100%);
+  margin: 0 auto;
+  border: 1px solid rgba(191, 212, 228, 0.9);
+  border-radius: 8px;
+  background: rgba(191, 212, 228, 0.9);
+  box-shadow: 0 14px 30px rgba(36, 55, 47, 0.06);
+}
+
+.ai-value-strip div {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.ai-value-strip strong {
+  color: var(--accent);
+  font-size: 0.98rem;
+}
+
+.ai-value-strip span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .business-panels {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -773,6 +804,13 @@ button.link-button {
   align-items: center;
 }
 
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .account-summary p:not(.eyebrow) {
   margin: 6px 0 0;
   color: var(--muted);
@@ -782,6 +820,50 @@ button.link-button {
   display: grid;
   gap: 14px;
   padding: 18px;
+  box-shadow: none;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  color: var(--accent);
+  background: #f7fbfa;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.admin-table td {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.admin-table td span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-table button {
+  min-height: 36px;
+  padding: 0 12px;
   box-shadow: none;
 }
 
@@ -1451,6 +1533,7 @@ textarea {
 
   .two-col,
   .landing-hero,
+  .ai-value-strip,
   .business-panels,
   .auth-grid,
   .convert-hero,

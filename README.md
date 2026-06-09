@@ -56,10 +56,23 @@ SMTP_SECURE=false
 SMTP_USER=your_smtp_username
 SMTP_PASSWORD=your_smtp_password
 SMTP_FROM=your_from_email
+STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+STRIPE_MONTHLY_PRICE_ID=price_monthly_optional
+STRIPE_YEARLY_PRICE_ID=price_yearly_optional
+STRIPE_CURRENCY=usd
 NODE_ENV=production
 ```
 
 The master account is created privately by the server and is not displayed on the public website. Password reset links are emailed through the SMTP settings above, use `/reset-password?token=...`, and expire after 30 minutes.
+
+Stripe Checkout is created through `POST /api/subscription/create-checkout`. Configure a Stripe webhook in Stripe Dashboard pointing to:
+
+```text
+https://your-domain.com/api/stripe/webhook
+```
+
+The webhook updates subscription access after checkout, failed payment, paid invoice, subscription update, or subscription cancellation. If `STRIPE_MONTHLY_PRICE_ID` and `STRIPE_YEARLY_PRICE_ID` are not provided, the app creates inline Stripe subscription prices from the built-in monthly and yearly plan amounts.
 
 ## Local Development
 
