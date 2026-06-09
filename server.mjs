@@ -1008,6 +1008,58 @@ async function updateSubscriptionByStripeSubscription(stripeSubscriptionId, stat
   );
 }
 
+async function updateSubscriptionByStripeCustomerOrSubscription(fields) {
+  const stripeCustomerId = fields.stripeCustomerId || null;
+  const stripeSubscriptionId = fields.stripeSubscriptionId || null;
+  if (!stripeCustomerId && !stripeSubscriptionId) return;
+
+  const active = fields.subscriptionStatus === "active";
+  await dbPool.execute(
+    `
+      UPDATE users
+      SET subscription_status = :subscriptionStatus,
+          payment_status = :paymentStatus,
+          has_full_access = :hasFullAccess,
+          subscription_expires_at = CASE WHEN :subscriptionStatus = 'active' THEN NULL ELSE NOW() END
+      WHERE (:stripeSubscriptionId IS NOT NULL AND stripe_subscription_id = :stripeSubscriptionId)
+         OR (:stripeCustomerId IS NOT NULL AND stripe_customer_id = :stripeCustomerId)
+    `,
+    {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      subscriptionStatus: fields.subscriptionStatus,
+      paymentStatus: fields.paymentStatus || fields.subscriptionStatus,
+      hasFullAccess: active ? 1 : 0
+    }
+  );
+
+  await dbPool.execute(
+    `
+      UPDATE payments
+      SET payment_status = :paymentStatus
+      WHERE (:stripeSubscriptionId IS NOT NULL AND stripe_subscription_id = :stripeSubscriptionId)
+         OR (:stripeCustomerId IS NOT NULL AND stripe_customer_id = :stripeCustomerId)
+    `,
+    {
+      stripeCustomerId,
+      stripeSubscriptionId,
+      paymentStatus: fields.paymentStatus || fields.subscriptionStatus
+    }
+  );
+}
+
+async function resolveStripeWebhookUserId(session) {
+  const metadata = session.metadata || {};
+  const metadataUserId = Number(metadata.user_id || metadata.userId || session.client_reference_id);
+  if (metadataUserId) return metadataUserId;
+
+  const email = normalizeEmail(metadata.user_email || session.customer_email || session.customer_details?.email);
+  if (!email) return null;
+
+  const [rows] = await dbPool.execute("SELECT id FROM users WHERE email = :email LIMIT 1", { email });
+  return rows[0]?.id || null;
+}
+
 function roundMoney(value) {
   return Math.max(0, Math.round(Number(value) * 100) / 100);
 }
@@ -1091,12 +1143,18 @@ async function handleCreateCheckout(request, response) {
       cancel_url: `${baseUrl}/subscription?checkout=cancel`,
       client_reference_id: String(user.id),
       metadata: {
+        user_id: String(user.id),
+        user_email: user.email,
+        plan_type: total.planType,
         userId: String(user.id),
         planType: total.planType,
         couponCode: total.couponCode || ""
       },
       subscription_data: {
         metadata: {
+          user_id: String(user.id),
+          user_email: user.email,
+          plan_type: total.planType,
           userId: String(user.id),
           planType: total.planType,
           couponCode: total.couponCode || ""
@@ -1194,8 +1252,9 @@ async function handleStripeWebhook(request, response) {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
-      const userId = Number(session.metadata?.userId || session.client_reference_id);
-      const planType = session.metadata?.planType && plans[session.metadata.planType] ? session.metadata.planType : "monthly";
+      const userId = await resolveStripeWebhookUserId(session);
+      const requestedPlanType = session.metadata?.plan_type || session.metadata?.planType;
+      const planType = requestedPlanType && plans[requestedPlanType] ? requestedPlanType : "monthly";
       const couponCode = session.metadata?.couponCode || null;
 
       if (userId) {
@@ -1219,7 +1278,7 @@ async function handleStripeWebhook(request, response) {
           { userId, couponCode }
         );
 
-        await dbPool.execute(
+        const [paymentUpdate] = await dbPool.execute(
           `
             UPDATE payments
             SET payment_status = 'paid',
@@ -1233,6 +1292,44 @@ async function handleStripeWebhook(request, response) {
             stripeSubscriptionId: getStripeId(session.subscription)
           }
         );
+
+        if (!paymentUpdate.affectedRows) {
+          await dbPool.execute(
+            `
+              INSERT INTO payments (
+                user_id,
+                plan_type,
+                coupon_code,
+                discount_amount,
+                final_amount,
+                payment_status,
+                stripe_checkout_session_id,
+                stripe_customer_id,
+                stripe_subscription_id
+              )
+              VALUES (
+                :userId,
+                :planType,
+                :couponCode,
+                0,
+                :finalAmount,
+                'paid',
+                :stripeCheckoutSessionId,
+                :stripeCustomerId,
+                :stripeSubscriptionId
+              )
+            `,
+            {
+              userId,
+              planType,
+              couponCode,
+              finalAmount: roundMoney((session.amount_total || 0) / 100),
+              stripeCheckoutSessionId: session.id,
+              stripeCustomerId: getStripeId(session.customer),
+              stripeSubscriptionId: getStripeId(session.subscription)
+            }
+          );
+        }
       }
     }
 
@@ -1243,7 +1340,12 @@ async function handleStripeWebhook(request, response) {
 
     if (event.type === "invoice.payment_failed") {
       const invoice = event.data.object;
-      await updateSubscriptionByStripeSubscription(getStripeId(invoice.subscription), "inactive", "payment_failed");
+      await updateSubscriptionByStripeCustomerOrSubscription({
+        stripeCustomerId: getStripeId(invoice.customer),
+        stripeSubscriptionId: getStripeId(invoice.subscription),
+        subscriptionStatus: "inactive",
+        paymentStatus: "payment_failed"
+      });
     }
 
     if (event.type === "invoice.paid") {
@@ -1839,6 +1941,14 @@ const server = createServer(async (request, response) => {
       "Allow": "GET, POST, OPTIONS"
     });
     response.end("Method not allowed");
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/stripe/webhook/status") {
+    sendJson(response, 200, {
+      ok: true,
+      message: "Stripe webhook endpoint is installed"
+    });
     return;
   }
 

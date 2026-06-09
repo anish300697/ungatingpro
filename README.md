@@ -74,6 +74,14 @@ https://your-domain.com/api/stripe/webhook
 
 The webhook updates subscription access after checkout, failed payment, paid invoice, subscription update, or subscription cancellation. If `STRIPE_MONTHLY_PRICE_ID` and `STRIPE_YEARLY_PRICE_ID` are not provided, the app creates inline Stripe subscription prices from the built-in monthly and yearly plan amounts.
 
+After deployment, confirm the webhook route is installed by opening:
+
+```text
+https://your-domain.com/api/stripe/webhook/status
+```
+
+It should return `{"ok":true,"message":"Stripe webhook endpoint is installed"}`.
+
 ## Local Development
 
 If Node.js is installed locally:
