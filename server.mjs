@@ -343,7 +343,7 @@ async function sendPasswordResetEmail(to, resetUrl) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
-    subject: "Reset your A2Z UNGATING password",
+    subject: "Reset your Ungating Pro password",
     text: `Use this secure link to reset your password. It expires in ${resetTokenMinutes} minutes:\n\n${resetUrl}`,
     html: `<p>Use this secure link to reset your password. It expires in ${resetTokenMinutes} minutes.</p><p><a href="${resetUrl}">Reset password</a></p>`
   });
@@ -982,7 +982,7 @@ async function handleWordConversion(request, response) {
 
     pdfDoc.setTitle("WORD_TO_PDF");
     pdfDoc.setSubject("Word documents converted to PDF");
-    pdfDoc.setCreator("A2Z UNGATING Convert");
+    pdfDoc.setCreator("Ungating Pro Convert");
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
@@ -1059,7 +1059,7 @@ async function handlePhotoConversion(request, response) {
 
     pdfDoc.setTitle("PHOTOS_TO_PDF");
     pdfDoc.setSubject("Photos converted to PDF");
-    pdfDoc.setCreator("A2Z UNGATING Convert");
+    pdfDoc.setCreator("Ungating Pro Convert");
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
@@ -1250,7 +1250,7 @@ async function handleMasterPdfGeneration(request, response) {
 
     pdfDoc.setTitle("Ungating_Package");
     pdfDoc.setSubject("Ungating master packet");
-    pdfDoc.setCreator("A2Z UNGATING");
+    pdfDoc.setCreator("Ungating Pro");
     const pdf = Buffer.from(await pdfDoc.save());
 
     response.writeHead(200, {
@@ -1435,5 +1435,5 @@ try {
 }
 
 server.listen(port, host, () => {
-  console.log(`A2Z UNGATING running on port ${port}`);
+  console.log(`Ungating Pro running on port ${port}`);
 });

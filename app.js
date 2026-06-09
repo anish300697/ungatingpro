@@ -787,7 +787,7 @@ async function buildPhotosPdfBytesWithBackend(files) {
       body: formData
     });
   } catch {
-    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
+    throw new Error("Open Ungating Pro from the hosted website or start the Node server, then try again.");
   }
 
   if (!response.ok) {
@@ -816,7 +816,7 @@ async function buildWordPdfBytesWithBackend(files) {
       body: formData
     });
   } catch {
-    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
+    throw new Error("Open Ungating Pro from the hosted website or start the Node server, then try again.");
   }
 
 
@@ -917,7 +917,7 @@ async function buildMasterPdfWithBackend(data) {
       body: formData
     });
   } catch {
-    throw new Error("Open A2Z UNGATING from the hosted website or start the Node server, then try again.");
+    throw new Error("Open Ungating Pro from the hosted website or start the Node server, then try again.");
   }
 
   if (!response.ok) {
