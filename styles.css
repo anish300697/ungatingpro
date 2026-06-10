@@ -830,7 +830,7 @@ button.link-button {
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 1240px;
 }
 
 .admin-table th,
@@ -865,6 +865,17 @@ button.link-button {
   min-height: 36px;
   padding: 0 12px;
   box-shadow: none;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.admin-actions button {
+  flex: 0 0 auto;
 }
 
 .admin-users {

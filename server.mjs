@@ -190,8 +190,11 @@ async function initDatabase() {
       access_source VARCHAR(32) NULL,
       stripe_customer_id VARCHAR(191) NULL,
       stripe_subscription_id VARCHAR(191) NULL,
+      freeall_used TINYINT(1) NOT NULL DEFAULT 0,
       has_full_access TINYINT(1) NOT NULL DEFAULT 0,
       access_expires_at DATETIME NULL,
+      trial_started_at DATETIME NULL,
+      trial_ends_at DATETIME NULL,
       subscription_started_at DATETIME NULL,
       subscription_expires_at DATETIME NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -292,8 +295,11 @@ async function ensureUserSubscriptionColumns() {
     ["access_source", "VARCHAR(32) NULL"],
     ["stripe_customer_id", "VARCHAR(191) NULL"],
     ["stripe_subscription_id", "VARCHAR(191) NULL"],
+    ["freeall_used", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["has_full_access", "TINYINT(1) NOT NULL DEFAULT 0"],
     ["access_expires_at", "DATETIME NULL"],
+    ["trial_started_at", "DATETIME NULL"],
+    ["trial_ends_at", "DATETIME NULL"],
     ["subscription_started_at", "DATETIME NULL"],
     ["subscription_expires_at", "DATETIME NULL"]
   ];
@@ -373,7 +379,10 @@ function publicUser(user) {
     accessSource: user.access_source || null,
     stripeCustomerId: user.stripe_customer_id || null,
     stripeSubscriptionId: user.stripe_subscription_id || null,
+    freeallUsed: Boolean(user.freeall_used),
     hasFullAccess: Boolean(user.has_full_access),
+    trialStartedAt: user.trial_started_at || null,
+    trialEndsAt: user.trial_ends_at || null,
     subscriptionStartedAt: user.subscription_started_at || null,
     subscriptionExpiresAt: user.subscription_expires_at || user.access_expires_at || null,
     hasActiveAccess: hasActiveAccess(user)
@@ -384,10 +393,12 @@ function hasActiveAccess(user) {
   if (!user) return false;
   if (user.is_master || user.role === "admin") return true;
   if (user.has_full_access) return true;
-  if (user.plan === "free_all" || user.plan_type === "free_all") return true;
   const status = user.subscription_status;
-  const activeStatus = status === "active" || status === "trial";
+  const activeStatus = status === "active" || status === "trialing";
   if (!activeStatus) return false;
+  if (status === "trialing" && user.trial_ends_at) {
+    return new Date(user.trial_ends_at).getTime() > Date.now();
+  }
   if (!user.subscription_expires_at) return true;
   return new Date(user.subscription_expires_at).getTime() > Date.now();
 }
@@ -827,9 +838,12 @@ async function handleAdminUsers(request, response) {
         u.payment_status,
         u.coupon_code,
         u.access_source,
+        u.freeall_used,
         u.has_full_access,
         u.stripe_customer_id,
         u.stripe_subscription_id,
+        u.trial_started_at,
+        u.trial_ends_at,
         u.subscription_started_at,
         u.subscription_expires_at,
         u.created_at,
@@ -861,11 +875,53 @@ async function handleAdminUserUpdate(request, response) {
   try {
     const payload = await readJsonBody(request);
     const userId = Number(payload.userId);
-    const subscriptionStatus = payload.subscriptionStatus === "active" ? "active" : "inactive";
-    const planType = plans[payload.planType] || payload.planType === "free_all" ? payload.planType : null;
+    const action = String(payload.action || "").trim();
+    const subscriptionStatus = payload.subscriptionStatus === "trialing" ? "trialing" : payload.subscriptionStatus === "active" ? "active" : "inactive";
+    const planType = plans[payload.planType] ? payload.planType : null;
 
     if (!userId) {
       sendJson(response, 400, { error: "User ID is required." });
+      return;
+    }
+
+    if (action === "extend") {
+      const days = Math.max(1, Math.min(365, Number(payload.days || 0)));
+      if (!days) {
+        sendJson(response, 400, { error: "Extension days are required." });
+        return;
+      }
+
+      await dbPool.execute(
+        `
+          UPDATE users
+          SET subscription_status = CASE WHEN subscription_status = 'trialing' THEN 'trialing' ELSE 'active' END,
+              payment_status = 'manual',
+              access_source = 'admin_extension',
+              has_full_access = 1,
+              subscription_expires_at = DATE_ADD(COALESCE(subscription_expires_at, NOW()), INTERVAL :days DAY),
+              trial_ends_at = CASE
+                WHEN subscription_status = 'trialing' THEN DATE_ADD(COALESCE(trial_ends_at, NOW()), INTERVAL :days DAY)
+                ELSE trial_ends_at
+              END
+          WHERE id = :userId AND is_master = 0
+        `,
+        { days, userId }
+      );
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+
+    if (action === "reset-freeall") {
+      await dbPool.execute(
+        `
+          UPDATE users
+          SET freeall_used = 0,
+              coupon_code = CASE WHEN coupon_code = 'FREEALL' THEN NULL ELSE coupon_code END
+          WHERE id = :userId AND is_master = 0
+        `,
+        { userId }
+      );
+      sendJson(response, 200, { ok: true });
       return;
     }
 
@@ -933,6 +989,7 @@ function getStripeId(value) {
 async function getCheckoutDiscount(stripe, couponCode) {
   const code = String(couponCode || "").trim().toUpperCase();
   if (!code) return null;
+  if (code === "FREEALL") return null;
 
   const configuredCouponId = getStripeCouponId(code);
   if (configuredCouponId) return { coupon: configuredCouponId };
@@ -969,7 +1026,7 @@ async function updateUserSubscription(userId, fields) {
           has_full_access = :hasFullAccess,
           stripe_customer_id = COALESCE(:stripeCustomerId, stripe_customer_id),
           stripe_subscription_id = COALESCE(:stripeSubscriptionId, stripe_subscription_id),
-          subscription_started_at = CASE WHEN :subscriptionStatus = 'active' THEN COALESCE(subscription_started_at, NOW()) ELSE subscription_started_at END,
+          subscription_started_at = CASE WHEN :subscriptionStatus IN ('active', 'trialing') THEN COALESCE(subscription_started_at, NOW()) ELSE subscription_started_at END,
           subscription_expires_at = :subscriptionExpiresAt
       WHERE id = :userId
     `,
@@ -990,18 +1047,23 @@ async function updateUserSubscription(userId, fields) {
 async function updateSubscriptionByStripeSubscription(stripeSubscriptionId, status, paymentStatus = null) {
   if (!stripeSubscriptionId) return;
   const active = status === "active" || status === "trialing";
+  const subscriptionStatus = active ? status : status === "canceled" ? "inactive" : status || "inactive";
   await dbPool.execute(
     `
       UPDATE users
       SET subscription_status = :subscriptionStatus,
           payment_status = :paymentStatus,
           has_full_access = :hasFullAccess,
-          subscription_expires_at = CASE WHEN :subscriptionStatus = 'active' THEN NULL ELSE NOW() END
+          subscription_expires_at = CASE
+            WHEN :subscriptionStatus = 'active' THEN NULL
+            WHEN :subscriptionStatus = 'trialing' THEN subscription_expires_at
+            ELSE NOW()
+          END
       WHERE stripe_subscription_id = :stripeSubscriptionId
     `,
     {
       stripeSubscriptionId,
-      subscriptionStatus: active ? "active" : "inactive",
+      subscriptionStatus,
       paymentStatus: paymentStatus || status || "inactive",
       hasFullAccess: active ? 1 : 0
     }
@@ -1013,14 +1075,18 @@ async function updateSubscriptionByStripeCustomerOrSubscription(fields) {
   const stripeSubscriptionId = fields.stripeSubscriptionId || null;
   if (!stripeCustomerId && !stripeSubscriptionId) return;
 
-  const active = fields.subscriptionStatus === "active";
+  const active = fields.subscriptionStatus === "active" || fields.subscriptionStatus === "trialing";
   await dbPool.execute(
     `
       UPDATE users
       SET subscription_status = :subscriptionStatus,
           payment_status = :paymentStatus,
           has_full_access = :hasFullAccess,
-          subscription_expires_at = CASE WHEN :subscriptionStatus = 'active' THEN NULL ELSE NOW() END
+          subscription_expires_at = CASE
+            WHEN :subscriptionStatus = 'active' THEN NULL
+            WHEN :subscriptionStatus = 'trialing' THEN subscription_expires_at
+            ELSE NOW()
+          END
       WHERE (:stripeSubscriptionId IS NOT NULL AND stripe_subscription_id = :stripeSubscriptionId)
          OR (:stripeCustomerId IS NOT NULL AND stripe_customer_id = :stripeCustomerId)
     `,
@@ -1064,6 +1130,10 @@ function roundMoney(value) {
   return Math.max(0, Math.round(Number(value) * 100) / 100);
 }
 
+function getTrialEndDate(days = 30) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
 function calculatePlanTotal(planType, couponCode = "") {
   const plan = plans[planType];
   if (!plan) {
@@ -1071,6 +1141,15 @@ function calculatePlanTotal(planType, couponCode = "") {
   }
 
   const normalizedCoupon = String(couponCode || "").trim().toUpperCase();
+  if (normalizedCoupon === "FREEALL") {
+    return {
+      ...plan,
+      couponCode: "FREEALL",
+      discountAmount: 0,
+      finalAmount: plan.planPrice
+    };
+  }
+
   const coupon = normalizedCoupon ? coupons[normalizedCoupon] : null;
   if (normalizedCoupon && !coupon) {
     return { error: "Invalid coupon code." };
@@ -1120,6 +1199,12 @@ async function handleCreateCheckout(request, response) {
       sendJson(response, 400, { error: total.error });
       return;
     }
+    const isFreeAllTrial = total.couponCode === "FREEALL";
+
+    if (isFreeAllTrial && user.freeall_used) {
+      sendJson(response, 400, { error: "This coupon has already been used on your account." });
+      return;
+    }
 
     const stripe = getStripeClient();
     if (!stripe) {
@@ -1139,13 +1224,17 @@ async function handleCreateCheckout(request, response) {
     const sessionPayload = {
       mode: "subscription",
       line_items: [priceConfig],
-      success_url: `${baseUrl}/dashboard?checkout=success`,
-      cancel_url: `${baseUrl}/subscription?checkout=cancel`,
+      success_url: isFreeAllTrial
+        ? `${baseUrl}/subscription-success?session_id={CHECKOUT_SESSION_ID}`
+        : `${baseUrl}/dashboard?checkout=success`,
+      cancel_url: isFreeAllTrial ? `${baseUrl}/subscription-cancelled` : `${baseUrl}/subscription?checkout=cancel`,
       client_reference_id: String(user.id),
       metadata: {
         user_id: String(user.id),
         user_email: user.email,
         plan_type: total.planType,
+        coupon_code: total.couponCode || "",
+        free_trial_days: isFreeAllTrial ? "30" : "",
         userId: String(user.id),
         planType: total.planType,
         couponCode: total.couponCode || ""
@@ -1155,12 +1244,19 @@ async function handleCreateCheckout(request, response) {
           user_id: String(user.id),
           user_email: user.email,
           plan_type: total.planType,
+          coupon_code: total.couponCode || "",
+          free_trial_days: isFreeAllTrial ? "30" : "",
           userId: String(user.id),
           planType: total.planType,
           couponCode: total.couponCode || ""
         }
       }
     };
+
+    if (isFreeAllTrial) {
+      sessionPayload.payment_method_collection = "always";
+      sessionPayload.subscription_data.trial_period_days = 30;
+    }
 
     if (user.stripe_customer_id) {
       sessionPayload.customer = user.stripe_customer_id;
@@ -1255,39 +1351,48 @@ async function handleStripeWebhook(request, response) {
       const userId = await resolveStripeWebhookUserId(session);
       const requestedPlanType = session.metadata?.plan_type || session.metadata?.planType;
       const planType = requestedPlanType && plans[requestedPlanType] ? requestedPlanType : "monthly";
-      const couponCode = session.metadata?.couponCode || null;
+      const couponCode = String(session.metadata?.coupon_code || session.metadata?.couponCode || "").trim().toUpperCase() || null;
+      const isFreeAllTrial = couponCode === "FREEALL";
+      const freeTrialDays = Number(session.metadata?.free_trial_days || 30);
+      const trialEndsAt = getTrialEndDate(freeTrialDays);
+      const subscriptionStatus = isFreeAllTrial ? "trialing" : "active";
+      const paymentStatus = isFreeAllTrial ? "trialing" : "paid";
 
       if (userId) {
         await updateUserSubscription(userId, {
-          subscriptionStatus: "active",
+          subscriptionStatus,
           planType,
-          paymentStatus: "paid",
-          accessSource: "stripe",
+          paymentStatus,
+          accessSource: isFreeAllTrial ? "stripe_trial_coupon" : "stripe",
           hasFullAccess: true,
           stripeCustomerId: getStripeId(session.customer),
           stripeSubscriptionId: getStripeId(session.subscription),
-          subscriptionExpiresAt: null
+          subscriptionExpiresAt: isFreeAllTrial ? trialEndsAt : null
         });
 
         await dbPool.execute(
           `
             UPDATE users
-            SET coupon_code = COALESCE(:couponCode, coupon_code)
+            SET coupon_code = COALESCE(:couponCode, coupon_code),
+                freeall_used = CASE WHEN :isFreeAllTrial = 1 THEN 1 ELSE freeall_used END,
+                trial_started_at = CASE WHEN :isFreeAllTrial = 1 THEN COALESCE(trial_started_at, NOW()) ELSE trial_started_at END,
+                trial_ends_at = CASE WHEN :isFreeAllTrial = 1 THEN :trialEndsAt ELSE trial_ends_at END
             WHERE id = :userId
           `,
-          { userId, couponCode }
+          { userId, couponCode, isFreeAllTrial: isFreeAllTrial ? 1 : 0, trialEndsAt }
         );
 
         const [paymentUpdate] = await dbPool.execute(
           `
             UPDATE payments
-            SET payment_status = 'paid',
+            SET payment_status = :paymentStatus,
                 stripe_customer_id = COALESCE(:stripeCustomerId, stripe_customer_id),
                 stripe_subscription_id = COALESCE(:stripeSubscriptionId, stripe_subscription_id)
             WHERE stripe_checkout_session_id = :sessionId
           `,
           {
             sessionId: session.id,
+            paymentStatus,
             stripeCustomerId: getStripeId(session.customer),
             stripeSubscriptionId: getStripeId(session.subscription)
           }
@@ -1313,7 +1418,7 @@ async function handleStripeWebhook(request, response) {
                 :couponCode,
                 0,
                 :finalAmount,
-                'paid',
+                :paymentStatus,
                 :stripeCheckoutSessionId,
                 :stripeCustomerId,
                 :stripeSubscriptionId
@@ -1324,6 +1429,7 @@ async function handleStripeWebhook(request, response) {
               planType,
               couponCode,
               finalAmount: roundMoney((session.amount_total || 0) / 100),
+              paymentStatus,
               stripeCheckoutSessionId: session.id,
               stripeCustomerId: getStripeId(session.customer),
               stripeSubscriptionId: getStripeId(session.subscription)
@@ -1333,9 +1439,14 @@ async function handleStripeWebhook(request, response) {
       }
     }
 
-    if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    if (event.type === "customer.subscription.updated") {
       const subscription = event.data.object;
       await updateSubscriptionByStripeSubscription(subscription.id, subscription.status, subscription.status);
+    }
+
+    if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object;
+      await updateSubscriptionByStripeSubscription(subscription.id, "inactive", "inactive");
     }
 
     if (event.type === "invoice.payment_failed") {
@@ -1343,7 +1454,7 @@ async function handleStripeWebhook(request, response) {
       await updateSubscriptionByStripeCustomerOrSubscription({
         stripeCustomerId: getStripeId(invoice.customer),
         stripeSubscriptionId: getStripeId(invoice.subscription),
-        subscriptionStatus: "inactive",
+        subscriptionStatus: "payment_failed",
         paymentStatus: "payment_failed"
       });
     }
@@ -1379,37 +1490,16 @@ async function handleApplyCoupon(request, response) {
       return;
     }
 
-    await dbPool.execute(
-      `
-        UPDATE users
-        SET subscription_status = 'active',
-            plan = :planType,
-            plan_type = :planType,
-            coupon_code = 'FREEALL',
-            access_source = 'coupon',
-            payment_status = 'coupon',
-            has_full_access = 1,
-            access_expires_at = NULL,
-            subscription_started_at = NOW(),
-            subscription_expires_at = NULL
-        WHERE id = :userId
-      `,
-      { userId: user.id, planType }
-    );
-
-    await dbPool.execute(
-      `
-        INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
-        VALUES (:userId, :planType, 'FREEALL', 0, 0, 'coupon')
-      `,
-      { userId: user.id, planType }
-    );
+    if (user.freeall_used) {
+      sendJson(response, 400, { success: false, message: "This coupon has already been used on your account." });
+      return;
+    }
 
     sendJson(response, 200, {
       success: true,
       plan: planType,
-      access: "full",
-      message: "Coupon applied successfully. Your subscription is now active."
+      access: "stripe_trial",
+      message: "Coupon accepted. Continue to Stripe Checkout to start your 30-day trial."
     });
   } catch (error) {
     sendJson(response, 500, { success: false, message: "Could not apply coupon." });
@@ -1906,6 +1996,8 @@ function getSafeStaticPath(pathname) {
     "/forgot-password",
     "/reset-password",
     "/subscription",
+    "/subscription-success",
+    "/subscription-cancelled",
     "/coupon",
     "/builder",
     "/dashboard",

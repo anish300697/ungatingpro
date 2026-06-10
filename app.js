@@ -582,11 +582,10 @@ function setActiveNav(activeLink) {
 function hasActiveSubscription(user = currentUser) {
   if (!user) return false;
   return Boolean(
-    user.hasActiveAccess ||
+      user.hasActiveAccess ||
       user.hasFullAccess ||
       user.subscriptionStatus === "active" ||
-      user.plan === "free_all" ||
-      user.planType === "free_all" ||
+      user.subscriptionStatus === "trialing" ||
       user.role === "admin" ||
       user.isMaster
   );
@@ -622,6 +621,23 @@ function getBuilderDestination() {
 function navigateTo(path) {
   window.history.pushState(null, "", path);
   handleRoute();
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function confirmSubscriptionAccess() {
+  showSubscriptionPage("Confirming your subscription with Stripe...");
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await checkCurrentUser();
+    if (hasActiveSubscription()) {
+      navigateTo("/builder");
+      return;
+    }
+    await wait(1200);
+  }
+  navigateTo("/dashboard");
 }
 
 function handleRoute() {
@@ -661,6 +677,16 @@ function handleRoute() {
       ? "An active subscription is required to use Ungate Builder."
       : "";
     showSubscriptionPage(message);
+    return;
+  }
+
+  if (path === "/subscription-success") {
+    confirmSubscriptionAccess();
+    return;
+  }
+
+  if (path === "/subscription-cancelled") {
+    showSubscriptionPage("Subscription checkout was cancelled. Choose a plan when you are ready.");
     return;
   }
 
@@ -1177,9 +1203,8 @@ async function applyCouponCode() {
     });
     couponApplied = true;
     els.continuePayment.disabled = false;
-    els.couponStatus.textContent = payload.message || "Coupon applied successfully. Your subscription is now active.";
-    await checkCurrentUser();
-    navigateTo("/builder");
+    els.couponStatus.textContent = payload.message || "Coupon accepted. Opening Stripe Checkout...";
+    await startStripeCheckout();
   } catch (error) {
     couponApplied = false;
     els.continuePayment.disabled = false;
@@ -1230,7 +1255,7 @@ async function loadAdminUsers() {
     const payload = await getJson("/api/admin/users");
     const users = payload.users || [];
     if (!users.length) {
-      els.adminUsers.innerHTML = `<tr><td colspan="7">No users found.</td></tr>`;
+      els.adminUsers.innerHTML = `<tr><td colspan="11">No users found.</td></tr>`;
       els.adminStatus.textContent = "";
       return;
     }
@@ -1249,22 +1274,51 @@ async function loadAdminUsers() {
             <td><span class="user-status ${active ? "is-active-user" : ""}">${escapeHtml(user.subscriptionStatus || "inactive")}</span></td>
             <td>${escapeHtml(user.planType || user.plan || "none")}</td>
             <td>${escapeHtml(user.couponCode || "none")}</td>
+            <td>${user.freeallUsed ? "Used" : "Available"}</td>
+            <td>${escapeHtml(formatDate(user.trialEndsAt))}</td>
+            <td>${escapeHtml(user.stripeCustomerId || "none")}</td>
+            <td>${escapeHtml(user.stripeSubscriptionId || "none")}</td>
             <td>${escapeHtml(formatDate(user.createdAt))}</td>
             <td>${Number(user.packageCount || 0)}</td>
-            <td><button type="button" data-user-id="${user.id}" data-action="${action}">${active ? "Deactivate" : "Activate"}</button></td>
+            <td>
+              <div class="admin-actions">
+                <button type="button" data-user-id="${user.id}" data-action="${action}">${active ? "Deactivate" : "Activate"}</button>
+                <button type="button" class="secondary" data-user-id="${user.id}" data-action="extend-7">+7 days</button>
+                <button type="button" class="secondary" data-user-id="${user.id}" data-action="extend-30">+30 days</button>
+                <button type="button" class="secondary" data-user-id="${user.id}" data-action="extend-custom">Custom</button>
+                <button type="button" class="secondary" data-user-id="${user.id}" data-action="reset-freeall">Reset FREEALL</button>
+              </div>
+            </td>
           </tr>`;
       })
       .join("");
     els.adminStatus.textContent = `${users.length} users loaded.`;
   } catch (error) {
     els.adminStatus.textContent = error.message;
-    els.adminUsers.innerHTML = `<tr><td colspan="7">Could not load users.</td></tr>`;
+    els.adminUsers.innerHTML = `<tr><td colspan="11">Could not load users.</td></tr>`;
   }
 }
 
 async function updateAdminUserAccess(userId, action) {
   els.adminStatus.textContent = "Updating user...";
   try {
+    if (action === "extend-7" || action === "extend-30" || action === "extend-custom") {
+      const days = action === "extend-custom" ? Number(window.prompt("How many days should be added?", "30")) : action === "extend-7" ? 7 : 30;
+      if (!days) {
+        els.adminStatus.textContent = "Extension cancelled.";
+        return;
+      }
+      await postJson("/api/admin/users/update", { userId, action: "extend", days });
+      await loadAdminUsers();
+      return;
+    }
+
+    if (action === "reset-freeall") {
+      await postJson("/api/admin/users/update", { userId, action: "reset-freeall" });
+      await loadAdminUsers();
+      return;
+    }
+
     await postJson("/api/admin/users/update", {
       userId,
       subscriptionStatus: action === "activate" ? "active" : "inactive",
