@@ -82,6 +82,14 @@ https://your-domain.com/api/stripe/webhook/status
 
 It should return `{"ok":true,"message":"Stripe webhook endpoint is installed"}`.
 
+Admins can verify a user's stored subscription state with:
+
+```text
+https://your-domain.com/api/admin/user-subscription-status?email=user@example.com
+```
+
+This route requires an authenticated admin session.
+
 ## Local Development
 
 If Node.js is installed locally:

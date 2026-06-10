@@ -947,6 +947,58 @@ async function handleAdminUserUpdate(request, response) {
   }
 }
 
+async function handleAdminUserSubscriptionStatus(request, response, url) {
+  if (!requireDatabase(response)) return;
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+
+  const email = normalizeEmail(url.searchParams.get("email"));
+  if (!isValidEmail(email)) {
+    sendJson(response, 400, { error: "A valid email query parameter is required." });
+    return;
+  }
+
+  try {
+    const [rows] = await dbPool.execute(
+      `
+        SELECT
+          email,
+          subscription_status,
+          plan_type,
+          coupon_code,
+          freeall_used,
+          stripe_customer_id,
+          stripe_subscription_id,
+          trial_ends_at
+        FROM users
+        WHERE email = :email
+        LIMIT 1
+      `,
+      { email }
+    );
+
+    if (!rows.length) {
+      sendJson(response, 404, { error: "User not found." });
+      return;
+    }
+
+    const user = rows[0];
+    sendJson(response, 200, {
+      email: user.email,
+      subscription_status: user.subscription_status || "inactive",
+      plan_type: user.plan_type || null,
+      coupon_code: user.coupon_code || null,
+      freeall_used: Boolean(user.freeall_used),
+      stripe_customer_id: user.stripe_customer_id || null,
+      stripe_subscription_id: user.stripe_subscription_id || null,
+      trial_ends_at: user.trial_ends_at || null
+    });
+  } catch (error) {
+    console.error(`Admin subscription status lookup failed: ${error.message}`);
+    sendJson(response, 500, { error: "Could not load subscription status." });
+  }
+}
+
 function getStripeClient() {
   if (!process.env.STRIPE_SECRET_KEY) return null;
   if (!stripeClient) stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -1345,6 +1397,8 @@ async function handleStripeWebhook(request, response) {
     return;
   }
 
+  console.log(`[Stripe webhook] event=${event.type}`);
+
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
@@ -1358,28 +1412,62 @@ async function handleStripeWebhook(request, response) {
       const subscriptionStatus = isFreeAllTrial ? "trialing" : "active";
       const paymentStatus = isFreeAllTrial ? "trialing" : "paid";
 
-      if (userId) {
-        await updateUserSubscription(userId, {
-          subscriptionStatus,
-          planType,
-          paymentStatus,
-          accessSource: isFreeAllTrial ? "stripe_trial_coupon" : "stripe",
-          hasFullAccess: true,
-          stripeCustomerId: getStripeId(session.customer),
-          stripeSubscriptionId: getStripeId(session.subscription),
-          subscriptionExpiresAt: isFreeAllTrial ? trialEndsAt : null
-        });
+      console.log(
+        `[Stripe webhook] checkout.session.completed session=${session.id} user_id=${userId || "missing"} plan_type=${planType} coupon_code=${couponCode || "none"}`
+      );
 
-        await dbPool.execute(
-          `
-            UPDATE users
-            SET coupon_code = COALESCE(:couponCode, coupon_code),
-                freeall_used = CASE WHEN :isFreeAllTrial = 1 THEN 1 ELSE freeall_used END,
-                trial_started_at = CASE WHEN :isFreeAllTrial = 1 THEN COALESCE(trial_started_at, NOW()) ELSE trial_started_at END,
-                trial_ends_at = CASE WHEN :isFreeAllTrial = 1 THEN :trialEndsAt ELSE trial_ends_at END
-            WHERE id = :userId
-          `,
-          { userId, couponCode, isFreeAllTrial: isFreeAllTrial ? 1 : 0, trialEndsAt }
+      if (userId) {
+        let userUpdate = { affectedRows: 0 };
+        if (isFreeAllTrial) {
+          [userUpdate] = await dbPool.execute(
+            `
+              UPDATE users
+              SET subscription_status = 'trialing',
+                  plan = :planType,
+                  plan_type = :planType,
+                  coupon_code = 'FREEALL',
+                  freeall_used = 1,
+                  access_source = 'stripe_trial_coupon',
+                  payment_status = 'trialing',
+                  has_full_access = 1,
+                  stripe_customer_id = COALESCE(:stripeCustomerId, stripe_customer_id),
+                  stripe_subscription_id = COALESCE(:stripeSubscriptionId, stripe_subscription_id),
+                  trial_started_at = NOW(),
+                  trial_ends_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+                  subscription_started_at = COALESCE(subscription_started_at, NOW()),
+                  subscription_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+              WHERE id = :userId
+            `,
+            {
+              userId,
+              planType,
+              stripeCustomerId: getStripeId(session.customer),
+              stripeSubscriptionId: getStripeId(session.subscription)
+            }
+          );
+        } else {
+          await updateUserSubscription(userId, {
+            subscriptionStatus,
+            planType,
+            paymentStatus,
+            accessSource: "stripe",
+            hasFullAccess: true,
+            stripeCustomerId: getStripeId(session.customer),
+            stripeSubscriptionId: getStripeId(session.subscription),
+            subscriptionExpiresAt: null
+          });
+          [userUpdate] = await dbPool.execute(
+            `
+              UPDATE users
+              SET coupon_code = COALESCE(:couponCode, coupon_code)
+              WHERE id = :userId
+            `,
+            { userId, couponCode }
+          );
+        }
+
+        console.log(
+          `[Stripe webhook] user_update user_id=${userId} affected_rows=${userUpdate.affectedRows || 0} status=${subscriptionStatus}`
         );
 
         const [paymentUpdate] = await dbPool.execute(
@@ -1396,6 +1484,9 @@ async function handleStripeWebhook(request, response) {
             stripeCustomerId: getStripeId(session.customer),
             stripeSubscriptionId: getStripeId(session.subscription)
           }
+        );
+        console.log(
+          `[Stripe webhook] payment_update session=${session.id} affected_rows=${paymentUpdate.affectedRows || 0} status=${paymentStatus}`
         );
 
         if (!paymentUpdate.affectedRows) {
@@ -1436,6 +1527,10 @@ async function handleStripeWebhook(request, response) {
             }
           );
         }
+      } else {
+        console.error(
+          `[Stripe webhook] user_update failed session=${session.id} metadata_user_id=${session.metadata?.user_id || "missing"} metadata_email=${session.metadata?.user_email || "missing"}`
+        );
       }
     }
 
@@ -2155,6 +2250,11 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "GET" && url.pathname === "/api/admin/users") {
     await handleAdminUsers(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/admin/user-subscription-status") {
+    await handleAdminUserSubscriptionStatus(request, response, url);
     return;
   }
 

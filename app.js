@@ -628,15 +628,17 @@ function wait(ms) {
 }
 
 async function confirmSubscriptionAccess() {
-  showSubscriptionPage("Confirming your subscription with Stripe...");
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  showSubscriptionPage("Finalizing your subscription...");
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    els.subscriptionStatus.textContent = "Finalizing your subscription...";
     await checkCurrentUser();
     if (hasActiveSubscription()) {
       navigateTo("/builder");
       return;
     }
-    await wait(1200);
+    await wait(2000);
   }
+  els.subscriptionStatus.textContent = "We are still waiting for Stripe confirmation. Refresh your dashboard in a moment.";
   navigateTo("/dashboard");
 }
 
