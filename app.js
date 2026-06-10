@@ -181,6 +181,71 @@ function clearFileUrls() {
   fileUrls = [];
 }
 
+function clearAppTransientState() {
+  clearFileUrls();
+
+  fields.marketplace.selectedIndex = 0;
+  fields.asin.value = "";
+  fields.productDescription.value = "";
+  fields.unitsPurchased.value = "10";
+  fields.supplierName.value = "";
+  fields.invoiceNumber.value = "";
+  fields.invoiceDate.value = "";
+  fields.buyerName.value = "";
+  fields.billingAddress.value = "";
+  fields.purchaseNotes.value = "";
+  fields.proofFiles.value = "";
+  fields.wordFiles.value = "";
+  fields.photoFiles.value = "";
+  fields.cameraPhotos.value = "";
+
+  els.signInForm?.reset();
+  els.createAccountForm?.reset();
+  els.forgotPasswordForm?.reset();
+  els.resetPasswordForm?.reset();
+  els.couponCode.value = "";
+  els.continuePayment.disabled = false;
+
+  selectedPlan = null;
+  couponApplied = false;
+  builderRequestedAfterLogin = false;
+  couponRequestedAfterLogin = false;
+  packetDocumentOrder = [];
+
+  sessionStorage.removeItem("selectedPlan");
+  sessionStorage.removeItem("builderRequestedAfterLogin");
+  sessionStorage.removeItem("couponRequestedAfterLogin");
+  localStorage.removeItem("selectedPlan");
+  localStorage.removeItem("builderRequestedAfterLogin");
+  localStorage.removeItem("couponRequestedAfterLogin");
+
+  els.documentIndex.className = "document-index empty-state";
+  els.documentIndex.textContent = "No files selected yet.";
+  els.fileCount.textContent = "0 files selected";
+  els.documentOrderList.className = "document-order-list empty-state";
+  els.documentOrderList.textContent = "No uploaded documents to arrange yet.";
+  els.masterPacket.innerHTML = "";
+  els.checklist.innerHTML = "";
+  els.scoreRing.textContent = "0%";
+  els.readinessTitle.textContent = "Packet readiness";
+  els.readinessHint.textContent = "Review the merged packet before saving.";
+  els.packetStatus.textContent = "Draft";
+
+  els.formStatus.textContent = "Ready when your product, supplier, and proof files are entered.";
+  els.mergeStatus.textContent = "";
+  els.downloadStatus.textContent = "";
+  els.wordConvertStatus.textContent = "";
+  els.photoConvertStatus.textContent = "";
+  els.couponStatus.textContent = "";
+  els.subscriptionStatus.textContent = "";
+  els.signInStatus.textContent = "";
+  els.createAccountStatus.textContent = "";
+  els.forgotPasswordStatus.textContent = "";
+  els.resetPasswordStatus.textContent = "";
+
+  updateConverterLists();
+}
+
 function createFileUrl(file) {
   const url = URL.createObjectURL(file);
   fileUrls.push(url);
@@ -908,6 +973,7 @@ async function convertPhotosToPdf() {
     const bytes = await buildPhotosPdfBytesWithBackend(files);
     downloadBlob(bytes, fileName);
     els.photoConvertStatus.textContent = `${fileName}.pdf downloaded.`;
+    setTimeout(clearAppTransientState, 500);
   } catch (error) {
     console.error(error);
     els.photoConvertStatus.textContent = `Could not convert photos: ${error.message}`;
@@ -928,6 +994,7 @@ async function convertWordToPdf() {
     const bytes = await buildWordPdfBytesWithBackend(files);
     downloadBlob(bytes, fileName);
     els.wordConvertStatus.textContent = `${fileName}.pdf downloaded.`;
+    setTimeout(clearAppTransientState, 500);
   } catch (error) {
     console.error(error);
     els.wordConvertStatus.textContent = `Could not convert Word files: ${error.message}`;
@@ -1005,6 +1072,10 @@ async function downloadPacketPdf() {
     const { bytes, fileName } = await buildMasterPdfWithBackend(data);
     downloadBlob(bytes, fileName);
     els.downloadStatus.textContent = `${fileName}.pdf downloaded.`;
+    setTimeout(() => {
+      clearAppTransientState();
+      navigateTo(getBuilderDestination());
+    }, 500);
   } catch (error) {
     console.error(error);
     els.downloadStatus.textContent = `Could not build the PDF: ${error.message}`;
@@ -1063,6 +1134,11 @@ async function checkCurrentUser() {
     const payload = await parseJsonResponse(await fetch("/api/auth/me"));
     renderAccount(payload.user);
   } catch {
+    if (currentUser) {
+      clearAppTransientState();
+      localStorage.removeItem("a2z_session");
+      localStorage.removeItem("authToken");
+    }
     renderAccount(null);
   }
 }
@@ -1153,17 +1229,11 @@ async function signOut() {
     sessionStorage.clear();
     localStorage.removeItem("a2z_session");
     localStorage.removeItem("authToken");
-    selectedPlan = null;
-    couponApplied = false;
+    localStorage.removeItem("selectedPlan");
+    localStorage.removeItem("builderRequestedAfterLogin");
+    localStorage.removeItem("couponRequestedAfterLogin");
+    clearAppTransientState();
     renderAccount(null);
-    clearFileUrls();
-    fields.proofFiles.value = "";
-    fields.wordFiles.value = "";
-    fields.photoFiles.value = "";
-    fields.cameraPhotos.value = "";
-    packetDocumentOrder = [];
-    buildPacket();
-    updateConverterLists();
     els.signInStatus.textContent = "Signed out.";
     window.history.replaceState(null, "", "/signin");
     showSignInPage();
