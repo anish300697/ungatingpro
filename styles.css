@@ -2015,6 +2015,7 @@ textarea:focus {
 .auth-hero > *,
 .entry-hero > * {
   position: relative;
+  z-index: 1;
 }
 
 .landing-copy h1::after {
@@ -2210,4 +2211,413 @@ textarea:focus {
   .upload-zone {
     min-height: 120px;
   }
+}
+
+/* Premium animated SaaS layer. CSS-only motion, no new libraries. */
+:root {
+  --premium-navy: #0b1830;
+  --premium-card: rgba(255, 255, 255, 0.74);
+  --premium-border: rgba(255, 255, 255, 0.58);
+  --premium-shadow: 0 24px 70px rgba(11, 24, 48, 0.14);
+  --premium-amber: #f4b45f;
+  --premium-mint: #38c792;
+}
+
+@keyframes floatSoft {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0) rotate(1.5deg);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes loaderProgress {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes loaderFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(2deg);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  gap: 24px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(244, 180, 95, 0.2), transparent 30%),
+    radial-gradient(circle at 72% 22%, rgba(56, 199, 146, 0.18), transparent 28%),
+    linear-gradient(145deg, #f8fbff 0%, #eef4fb 100%);
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.app-loader.is-done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.loader-stage {
+  position: relative;
+  width: min(420px, 86vw);
+  height: 230px;
+}
+
+.loader-card,
+.loader-package {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--premium-shadow);
+}
+
+.loader-card {
+  display: grid;
+  align-content: space-between;
+  width: 138px;
+  height: 166px;
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--premium-navy);
+  animation: loaderFloat 2.1s ease-in-out infinite;
+}
+
+.loader-card span {
+  color: #6b7687;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.loader-card strong {
+  color: var(--accent-2);
+  font-size: 2rem;
+}
+
+.loader-card-a {
+  left: 18px;
+  top: 34px;
+}
+
+.loader-card-b {
+  left: 142px;
+  top: 10px;
+  animation-delay: 0.2s;
+}
+
+.loader-card-c {
+  right: 18px;
+  top: 46px;
+  animation-delay: 0.4s;
+}
+
+.loader-card-c strong {
+  color: var(--premium-mint);
+}
+
+.loader-package {
+  left: 50%;
+  bottom: 0;
+  width: 82px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  transform: translateX(-50%) rotate(45deg);
+  background:
+    linear-gradient(135deg, rgba(244, 180, 95, 0.9), rgba(239, 125, 66, 0.82)),
+    linear-gradient(45deg, transparent 47%, rgba(255, 255, 255, 0.54) 48%, rgba(255, 255, 255, 0.54) 52%, transparent 53%);
+}
+
+.loader-copy {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  width: min(420px, 86vw);
+}
+
+.loader-logo {
+  font-size: 1.9rem;
+}
+
+.loader-copy p {
+  margin: 0;
+  color: #4b5565;
+  font-weight: 900;
+}
+
+.loader-progress {
+  overflow: hidden;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(11, 24, 48, 0.08);
+}
+
+.loader-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-2), var(--premium-mint), var(--accent-3));
+  transform-origin: left;
+  animation: loaderProgress 1.65s ease forwards;
+}
+
+body {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(244, 180, 95, 0.15), transparent 26%),
+    radial-gradient(circle at 86% 12%, rgba(56, 199, 146, 0.11), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #f2f6fb 45%, #ffffff 100%);
+}
+
+.site-nav {
+  border-bottom-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 18px 50px rgba(11, 24, 48, 0.08);
+}
+
+.site-links a {
+  position: relative;
+  overflow: hidden;
+}
+
+.site-links a::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-2), var(--premium-mint));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.site-links a:hover::after,
+.site-links a.is-active::after {
+  transform: scaleX(1);
+}
+
+.landing-hero,
+.convert-hero,
+.subscription-hero,
+.auth-hero,
+.entry-hero,
+.converter-card,
+.pricing-card,
+.auth-card,
+.account-panel,
+.admin-panel,
+.form-panel,
+.master-packet-panel,
+.review-sidebar,
+.business-panels article,
+.ai-value-strip div {
+  background: var(--premium-card);
+  border-color: var(--premium-border);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--premium-shadow);
+}
+
+.landing-hero {
+  isolation: isolate;
+}
+
+.landing-visual,
+.seller-visual,
+.convert-graphic,
+.subscription-graphic {
+  animation: floatSoft 7s ease-in-out infinite;
+}
+
+.landing-visual svg,
+.seller-visual svg,
+.convert-graphic svg,
+.subscription-graphic svg {
+  filter: drop-shadow(0 18px 28px rgba(11, 24, 48, 0.08));
+}
+
+.pricing-card li::before,
+.checklist li.complete .badge {
+  animation: fadeSlideUp 0.28s ease both;
+}
+
+button,
+.landing-actions a,
+.auth-link,
+.converter-upload,
+.upload-zone,
+input,
+select,
+textarea {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: rgba(45, 125, 210, 0.38);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  transform: translateY(-1px);
+}
+
+.converter-card,
+.pricing-card,
+.auth-card,
+.account-panel,
+.admin-panel,
+.form-section,
+.document-order-panel,
+.packet-document {
+  animation: fadeSlideUp 0.45s ease both;
+}
+
+.pricing-card.featured {
+  position: relative;
+  border-color: rgba(244, 180, 95, 0.58);
+}
+
+.pricing-card.featured::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(244, 180, 95, 0.42), rgba(56, 199, 146, 0.22), rgba(45, 125, 210, 0.24));
+  filter: blur(18px);
+  opacity: 0.52;
+}
+
+.plan-badge {
+  background: linear-gradient(135deg, var(--premium-amber), var(--accent-2));
+  box-shadow: 0 12px 24px rgba(239, 125, 66, 0.18);
+}
+
+.coupon-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.form-panel {
+  position: relative;
+}
+
+.form-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--accent-2), var(--premium-mint), var(--accent-3));
+}
+
+.section-title span {
+  position: relative;
+}
+
+.section-title span::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(244, 180, 95, 0.32);
+  border-radius: inherit;
+  animation: floatSoft 4.5s ease-in-out infinite;
+}
+
+.download-status,
+.status-copy,
+.form-status,
+.centered-status {
+  border-radius: 8px;
+}
+
+.download-status:not(:empty),
+.status-copy:not(:empty),
+.form-status:not(:empty),
+.centered-status:not(:empty) {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(217, 226, 236, 0.72);
+}
+
+.document-order-actions button,
+.admin-actions button {
+  transform: none;
+}
+
+.document-order-actions button:hover:not(:disabled),
+.admin-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 920px) {
+}
+
+@media (max-width: 560px) {
+  .app-loader {
+    padding: 18px;
+  }
+
+  .loader-stage {
+    height: 190px;
+  }
+
+  .loader-card {
+    width: 116px;
+    height: 142px;
+  }
+
+  .loader-card-b {
+    left: 102px;
+  }
+
 }

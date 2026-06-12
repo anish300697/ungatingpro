@@ -15,9 +15,34 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon/ungatingpro-door-180.png?v=20260609b" />
     <link rel="icon" type="image/png" sizes="512x512" href="/assets/favicon/ungatingpro-door-512.png?v=20260609b" />
     <link rel="manifest" href="/site.webmanifest?v=20260609b" />
-    <link rel="stylesheet" href="styles.css?v=20260612-interface-refresh" />
+    <link rel="stylesheet" href="styles.css?v=20260612-premium-motion" />
   </head>
   <body>
+    <div id="appLoader" class="app-loader" aria-live="polite" aria-label="Loading UngatingPro">
+      <div class="loader-stage" aria-hidden="true">
+        <div class="loader-card loader-card-a">
+          <span>Invoice</span>
+          <strong>PDF</strong>
+        </div>
+        <div class="loader-card loader-card-b">
+          <span>Photos</span>
+          <strong>IMG</strong>
+        </div>
+        <div class="loader-card loader-card-c">
+          <span>Approved</span>
+          <strong>OK</strong>
+        </div>
+        <div class="loader-package"></div>
+      </div>
+      <div class="loader-copy">
+        <div class="logo-wordmark loader-logo">
+          <span class="logo-word">Ungating</span><span class="logo-pro">Pro</span>
+        </div>
+        <p id="loaderText">Preparing your workspace</p>
+        <div class="loader-progress"><span></span></div>
+      </div>
+    </div>
+
     <main class="app-shell">
       <nav class="site-nav" aria-label="Primary navigation">
         <a class="logo-container" id="homeLink" href="/" aria-label="UngatingPro home">
@@ -618,6 +643,7 @@
           </section>
         </section>
       </section>
+
     </main>
 
     <script src="app.js"></script>

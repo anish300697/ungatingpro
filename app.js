@@ -100,6 +100,9 @@ const els = {
   signOutButton: document.querySelector("#signOutButton")
 };
 
+const loaderText = document.querySelector("#loaderText");
+const appLoader = document.querySelector("#appLoader");
+
 let fileUrls = [];
 let packetDocumentOrder = [];
 let currentUser = null;
@@ -114,6 +117,31 @@ const planDetails = {
   monthly: { planType: "monthly", planName: "Unlimited Generate", billingType: "Monthly", price: 9.99 },
   yearly: { planType: "yearly", planName: "Unlimited Generate", billingType: "Yearly", price: 96 }
 };
+
+function initPremiumLoader() {
+  if (!appLoader || !loaderText) return;
+
+  const messages = [
+    "Preparing your workspace",
+    "Organizing documents",
+    "Building approval flow",
+    "Opening UngatingPro"
+  ];
+
+  messages.forEach((message, index) => {
+    setTimeout(() => {
+      loaderText.textContent = message;
+    }, index * 360);
+  });
+
+  setTimeout(() => {
+    appLoader.classList.add("is-done");
+  }, 1650);
+
+  setTimeout(() => {
+    appLoader.remove();
+  }, 2250);
+}
 
 const requiredEvidence = [
   {
@@ -1563,7 +1591,6 @@ els.adminUsers?.addEventListener("click", (event) => {
   if (!button) return;
   updateAdminUserAccess(Number(button.dataset.userId), button.dataset.action);
 });
-
 Object.values(fields).forEach((field) => {
   field.addEventListener("input", buildPacket);
   field.addEventListener("change", buildPacket);
@@ -1572,6 +1599,7 @@ Object.values(fields).forEach((field) => {
 buildPacket();
 updateConverterLists();
 setupDragAndDrop();
+initPremiumLoader();
 window.addEventListener("popstate", handleRoute);
 window.addEventListener("pageshow", async (event) => {
   if (!event.persisted) return;
