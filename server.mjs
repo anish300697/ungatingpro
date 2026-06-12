@@ -85,6 +85,7 @@ function sendJson(response, status, payload) {
   response.writeHead(status, {
     ...securityHeaders,
     "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Content-Type": "application/json; charset=utf-8"
   });
   response.end(JSON.stringify(payload));
@@ -94,6 +95,7 @@ function sendJsonWithHeaders(response, status, payload, headers = {}) {
   response.writeHead(status, {
     ...securityHeaders,
     "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Content-Type": "application/json; charset=utf-8",
     ...headers
   });
@@ -1575,13 +1577,49 @@ async function handleApplyCoupon(request, response) {
     const code = String(payload.code || "").trim().toUpperCase();
     const planType = String(payload.planType || "monthly").trim().toLowerCase();
 
-    if (code !== "FREEALL") {
+    if (code !== "FREEALL" && code !== "UNGATE") {
       sendJson(response, 400, { success: false, message: "Invalid coupon code." });
       return;
     }
 
     if (!plans[planType]) {
       sendJson(response, 400, { success: false, message: "Select a valid monthly or yearly plan." });
+      return;
+    }
+
+    if (code === "UNGATE") {
+      await dbPool.execute(
+        `
+          UPDATE users
+          SET subscription_status = 'active',
+              plan = :planType,
+              plan_type = :planType,
+              coupon_code = 'UNGATE',
+              access_source = 'coupon_ungate',
+              payment_status = 'coupon',
+              has_full_access = 0,
+              subscription_started_at = NOW(),
+              subscription_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+          WHERE id = :userId
+        `,
+        { userId: user.id, planType }
+      );
+
+      await dbPool.execute(
+        `
+          INSERT INTO payments (user_id, plan_type, coupon_code, discount_amount, final_amount, payment_status)
+          VALUES (:userId, :planType, 'UNGATE', 0, 0, 'coupon')
+        `,
+        { userId: user.id, planType }
+      );
+
+      sendJson(response, 200, {
+        success: true,
+        plan: planType,
+        access: "temporary_full",
+        expiresInDays: 30,
+        message: "Coupon applied successfully. Full access is unlocked for 30 days."
+      });
       return;
     }
 

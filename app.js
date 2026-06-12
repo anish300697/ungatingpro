@@ -108,6 +108,7 @@ let selectedPlan = JSON.parse(sessionStorage.getItem("selectedPlan") || "null");
 let builderRequestedAfterLogin = sessionStorage.getItem("builderRequestedAfterLogin") === "true";
 let couponRequestedAfterLogin = sessionStorage.getItem("couponRequestedAfterLogin") === "true";
 let couponApplied = false;
+let isSigningOut = false;
 
 const planDetails = {
   monthly: { planType: "monthly", planName: "Unlimited Generate", billingType: "Monthly", price: 9.99 },
@@ -595,28 +596,30 @@ function showSignInPage() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function showDashboardPage() {
-  if (!currentUser) {
+async function showDashboardPage() {
+  const user = await checkCurrentUser();
+  if (!user) {
     navigateTo("/signin?redirect=dashboard");
     return;
   }
 
   showOnly(els.dashboardPage);
-  els.dashboardName.textContent = currentUser.name || "Account";
-  els.dashboardAccess.textContent = hasActiveSubscription()
-    ? `Access active${currentUser.planType ? ` - ${currentUser.planType}` : ""}.`
+  els.dashboardName.textContent = user.name || "Account";
+  els.dashboardAccess.textContent = hasActiveSubscription(user)
+    ? `Access active${user.planType ? ` - ${user.planType}` : ""}.`
     : "Subscription inactive. Choose a plan to unlock Ungate Builder.";
-  els.dashboardAdmin?.classList.toggle("is-hidden", !isAdmin());
+  els.dashboardAdmin?.classList.toggle("is-hidden", !isAdmin(user));
   setActiveNav(null);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function showAdminPage() {
-  if (!currentUser) {
+  const user = await checkCurrentUser();
+  if (!user) {
     navigateTo("/signin?redirect=admin");
     return;
   }
-  if (!isAdmin()) {
+  if (!isAdmin(user)) {
     navigateTo("/dashboard");
     return;
   }
@@ -656,8 +659,9 @@ function hasActiveSubscription(user = currentUser) {
   );
 }
 
-function openBuilder() {
-  if (!currentUser) {
+async function openBuilder() {
+  const user = await checkCurrentUser();
+  if (!user) {
     builderRequestedAfterLogin = true;
     sessionStorage.setItem("builderRequestedAfterLogin", "true");
     navigateTo("/signin?redirect=builder");
@@ -665,7 +669,7 @@ function openBuilder() {
     return;
   }
 
-  if (!hasActiveSubscription()) {
+  if (!hasActiveSubscription(user)) {
     navigateTo("/subscription?redirect=builder");
     return;
   }
@@ -681,6 +685,10 @@ function getBuilderDestination() {
   if (!currentUser) return "/signin?redirect=builder";
   if (!hasActiveSubscription()) return "/subscription?redirect=builder";
   return "/builder";
+}
+
+function isProtectedPath(path = window.location.pathname) {
+  return ["/account", "/dashboard", "/admin", "/builder"].includes(path);
 }
 
 function navigateTo(path) {
@@ -1085,6 +1093,8 @@ async function downloadPacketPdf() {
 async function postJson(url, payload = {}) {
   const response = await fetch(url, {
     method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
@@ -1092,7 +1102,7 @@ async function postJson(url, payload = {}) {
 }
 
 async function getJson(url) {
-  return parseJsonResponse(await fetch(url));
+  return parseJsonResponse(await fetch(url, { credentials: "same-origin", cache: "no-store" }));
 }
 
 async function parseJsonResponse(response) {
@@ -1130,9 +1140,11 @@ function renderAccount(user) {
 }
 
 async function checkCurrentUser() {
+  if (isSigningOut) return null;
   try {
-    const payload = await parseJsonResponse(await fetch("/api/auth/me"));
+    const payload = await parseJsonResponse(await fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" }));
     renderAccount(payload.user);
+    return payload.user;
   } catch {
     if (currentUser) {
       clearAppTransientState();
@@ -1140,6 +1152,7 @@ async function checkCurrentUser() {
       localStorage.removeItem("authToken");
     }
     renderAccount(null);
+    return null;
   }
 }
 
@@ -1199,7 +1212,10 @@ function continueAfterAuth(user) {
       navigateTo("/subscription?redirect=builder");
       els.subscriptionStatus.textContent = "An active subscription is required to use Ungate Builder.";
     }
+    return;
   }
+
+  navigateTo("/dashboard");
 }
 
 async function handleCreateAccount(event) {
@@ -1222,6 +1238,9 @@ async function handleCreateAccount(event) {
 }
 
 async function signOut() {
+  if (isSigningOut) return;
+  isSigningOut = true;
+  const previousPath = window.location.pathname;
   try {
     await postJson("/api/auth/logout");
   } finally {
@@ -1237,6 +1256,10 @@ async function signOut() {
     els.signInStatus.textContent = "Signed out.";
     window.history.replaceState(null, "", "/signin");
     showSignInPage();
+    if (previousPath !== "/signin") {
+      window.history.pushState(null, "", "/signin");
+    }
+    isSigningOut = false;
   }
 }
 
@@ -1275,6 +1298,14 @@ async function applyCouponCode() {
     });
     couponApplied = true;
     els.continuePayment.disabled = false;
+
+    if (payload.access === "temporary_full") {
+      els.couponStatus.textContent = payload.message || "Coupon applied successfully. Full access is unlocked for 30 days.";
+      await checkCurrentUser();
+      navigateTo("/builder");
+      return;
+    }
+
     els.couponStatus.textContent = payload.message || "Coupon accepted. Opening Stripe Checkout...";
     await startStripeCheckout();
   } catch (error) {
@@ -1297,6 +1328,10 @@ async function startStripeCheckout() {
   els.continuePayment.disabled = true;
 
   try {
+    if (els.couponCode.value.trim().toUpperCase() === "UNGATE") {
+      throw new Error("Click Apply Coupon to unlock 30 days with UNGATE.");
+    }
+
     const payload = await postJson("/api/subscription/create-checkout", {
       planType: selectedPlan?.planType || "monthly",
       couponCode: els.couponCode.value.trim()
@@ -1538,6 +1573,19 @@ buildPacket();
 updateConverterLists();
 setupDragAndDrop();
 window.addEventListener("popstate", handleRoute);
+window.addEventListener("pageshow", async (event) => {
+  if (!event.persisted) return;
+  await checkCurrentUser();
+  handleRoute();
+});
+window.addEventListener("focus", async () => {
+  if (!isProtectedPath()) return;
+  const user = await checkCurrentUser();
+  if (!user) {
+    window.history.replaceState(null, "", `/signin?redirect=${window.location.pathname.replace("/", "") || "dashboard"}`);
+    showSignInPage();
+  }
+});
 
 (async function initApp() {
   await checkCurrentUser();
