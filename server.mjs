@@ -2099,7 +2099,9 @@ async function handleMasterPdfGeneration(request, response) {
       await appendMasterFile(pdfDoc, file);
     }
 
-    pdfDoc.setTitle("Ungating_Package");
+    const packetFileName = `${sanitizeFileName(String(data.asin || "ASIN").replace(/[^A-Z0-9_-]/gi, "").toUpperCase() || "ASIN")}_INVOICE.pdf`;
+
+    pdfDoc.setTitle(packetFileName.replace(/\.pdf$/i, ""));
     pdfDoc.setSubject("Ungating master packet");
     pdfDoc.setCreator("Ungating Pro");
     const pdf = Buffer.from(await pdfDoc.save());
@@ -2110,7 +2112,7 @@ async function handleMasterPdfGeneration(request, response) {
       "Access-Control-Expose-Headers": "Content-Disposition",
       "Content-Type": "application/pdf",
       "Content-Length": pdf.length,
-      "Content-Disposition": 'attachment; filename="Ungating_Package.pdf"'
+      "Content-Disposition": `attachment; filename="${packetFileName}"`
     });
     response.end(pdf);
   } catch (error) {

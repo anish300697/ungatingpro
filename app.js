@@ -1096,13 +1096,14 @@ async function buildMasterPdfWithBackend(data) {
 
   return {
     bytes: new Uint8Array(await response.arrayBuffer()),
-    fileName: getResponseFileName(response, "Ungating_Package")
+    fileName: getResponseFileName(response, getPacketFileName(data))
   };
 }
 
 async function downloadPacketPdf() {
   const data = buildPacket({ preserveOrder: true });
-  els.downloadStatus.textContent = "Building Ungating_Package.pdf...";
+  const packetFileName = getPacketFileName(data);
+  els.downloadStatus.textContent = `Building ${packetFileName}.pdf...`;
 
   try {
     const { bytes, fileName } = await buildMasterPdfWithBackend(data);
